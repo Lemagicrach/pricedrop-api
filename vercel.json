@@ -20,10 +20,8 @@
       ]
     }
   ],
-  "crons": [
-    {
-      "path": "/api/cron/check-prices",
-      "schedule": "0 */6 * * *"
-    }
-  ]
+  "crons": [{
+    "path": "/api/cron",
+    "schedule": "0 10 * * *"
+  }]
 }
