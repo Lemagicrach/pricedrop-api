@@ -1,0 +1,776 @@
+openapi: 3.0.3
+info:
+  title: PriceDrop API
+  description: |
+    ## Real-time Price Tracking & Monitoring API
+    
+    Track products from major e-commerce platforms and get instant notifications when prices drop. Monitor price history, set custom alerts, and analyze pricing trends across multiple stores.
+    
+    ### Key Features:
+    - 🔍 Track products from Amazon, Best Buy, Walmart, Target, and more
+    - 📊 Historical price data and trend analysis
+    - 🔔 Customizable price drop alerts
+    - 📈 Price predictions and analytics
+    - ⚡ Real-time price checking
+    - 🌍 Support for international stores
+    
+    ### Supported Stores:
+    - Amazon (US, UK, DE, FR, CA)
+    - Best Buy
+    - Walmart
+    - Target
+    - eBay
+    - Newegg
+    - B&H Photo
+    - Home Depot
+    - And more...
+    
+    ### Rate Limits:
+    - **Free Plan**: 100 requests/day, 10 products tracked
+    - **Basic Plan**: 1,000 requests/day, 100 products tracked
+    - **Pro Plan**: 10,000 requests/day, 1,000 products tracked
+    - **Enterprise**: Custom limits, unlimited products
+    
+  version: 1.0.0
+  termsOfService: https://pricedrop-api.vercel.app/terms
+  contact:
+    name: API Support
+    email: support@pricedrop-api.com
+    url: https://pricedrop-api.vercel.app/support
+  license:
+    name: MIT
+    url: https://opensource.org/licenses/MIT
+
+servers:
+  - url: https://pricedrop-api.vercel.app/api
+    description: Production Server
+  - url: https://pricedrop-api-staging.vercel.app/api
+    description: Staging Server
+
+tags:
+  - name: Products
+    description: Product tracking and management
+  - name: Prices
+    description: Price checking and history
+  - name: Alerts
+    description: Price drop alerts and notifications
+  - name: Health
+    description: API health and status
+
+paths:
+  /health:
+    get:
+      tags:
+        - Health
+      summary: Health Check
+      description: Check if the API is operational
+      operationId: healthCheck
+      responses:
+        '200':
+          description: API is healthy
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: healthy
+                  timestamp:
+                    type: string
+                    format: date-time
+                  version:
+                    type: string
+                    example: 1.0.0
+                  service:
+                    type: string
+                    example: PriceDrop API
+
+  /track:
+    post:
+      tags:
+        - Products
+      summary: Track Product
+      description: Start tracking a product for price changes
+      operationId: trackProduct
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - url
+              properties:
+                url:
+                  type: string
+                  format: uri
+                  description: Product URL to track
+                  example: https://www.amazon.com/dp/B08N5WRWNW
+                target_price:
+                  type: number
+                  format: float
+                  description: Target price for alerts (optional)
+                  example: 199.99
+                notify_on_drop:
+                  type: boolean
+                  description: Enable price drop notifications
+                  default: false
+                  example: true
+            examples:
+              amazon:
+                summary: Amazon Product
+                value:
+                  url: https://www.amazon.com/dp/B08N5WRWNW
+                  target_price: 179.99
+                  notify_on_drop: true
+              bestbuy:
+                summary: Best Buy Product
+                value:
+                  url: https://www.bestbuy.com/site/6428324.p
+                  target_price: 299.99
+                  notify_on_drop: true
+      responses:
+        '201':
+          description: Product successfully tracked
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  product:
+                    $ref: '#/components/schemas/Product'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '409':
+          description: Product already being tracked
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                    example: Product already being tracked
+                  product:
+                    $ref: '#/components/schemas/Product'
+        '422':
+          description: Unsupported store
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '429':
+          $ref: '#/components/responses/RateLimitExceeded'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /products:
+    get:
+      tags:
+        - Products
+      summary: List Tracked Products
+      description: Get all products being tracked by the authenticated user
+      operationId: listProducts
+      parameters:
+        - name: limit
+          in: query
+          description: Number of products to return
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 20
+        - name: offset
+          in: query
+          description: Number of products to skip
+          schema:
+            type: integer
+            minimum: 0
+            default: 0
+        - name: sort
+          in: query
+          description: Sort field
+          schema:
+            type: string
+            enum: [created_at, updated_at, current_price, name]
+            default: created_at
+        - name: order
+          in: query
+          description: Sort order
+          schema:
+            type: string
+            enum: [asc, desc]
+            default: desc
+      responses:
+        '200':
+          description: List of tracked products
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  products:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Product'
+                  pagination:
+                    type: object
+                    properties:
+                      total:
+                        type: integer
+                        example: 42
+                      limit:
+                        type: integer
+                        example: 20
+                      offset:
+                        type: integer
+                        example: 0
+                      has_more:
+                        type: boolean
+                        example: true
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '429':
+          $ref: '#/components/responses/RateLimitExceeded'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /products/{id}:
+    get:
+      tags:
+        - Products
+      summary: Get Product Details
+      description: Get detailed information about a specific tracked product including price history
+      operationId: getProduct
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: Product ID
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Product details with price history
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  product:
+                    allOf:
+                      - $ref: '#/components/schemas/Product'
+                      - type: object
+                        properties:
+                          price_history:
+                            type: array
+                            items:
+                              $ref: '#/components/schemas/PriceHistory'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '429':
+          $ref: '#/components/responses/RateLimitExceeded'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+    
+    delete:
+      tags:
+        - Products
+      summary: Delete Tracked Product
+      description: Stop tracking a product
+      operationId: deleteProduct
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: Product ID
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Product deleted successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                    example: Product deleted successfully
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '429':
+          $ref: '#/components/responses/RateLimitExceeded'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /price/{id}:
+    get:
+      tags:
+        - Prices
+      summary: Get Current Price
+      description: Get the current price of a tracked product with optional refresh
+      operationId: getCurrentPrice
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: Product ID
+          schema:
+            type: string
+            format: uuid
+        - name: refresh
+          in: query
+          description: Force refresh price from source
+          schema:
+            type: boolean
+            default: false
+      responses:
+        '200':
+          description: Current price information
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  price:
+                    type: number
+                    format: float
+                    example: 249.99
+                  currency:
+                    type: string
+                    example: USD
+                  in_stock:
+                    type: boolean
+                    example: true
+                  lowest_price:
+                    type: number
+                    format: float
+                    example: 199.99
+                  highest_price:
+                    type: number
+                    format: float
+                    example: 299.99
+                  last_updated:
+                    type: string
+                    format: date-time
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '429':
+          $ref: '#/components/responses/RateLimitExceeded'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /alerts/create:
+    post:
+      tags:
+        - Alerts
+      summary: Create Price Alert
+      description: Create a new price alert for a tracked product
+      operationId: createAlert
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - product_id
+                - target_price
+              properties:
+                product_id:
+                  type: string
+                  format: uuid
+                  description: ID of the tracked product
+                target_price:
+                  type: number
+                  format: float
+                  description: Price threshold for alert
+                  example: 199.99
+                alert_type:
+                  type: string
+                  enum: [price_drop, back_in_stock, any_change]
+                  default: price_drop
+                  description: Type of alert
+                notification_channels:
+                  type: array
+                  items:
+                    type: string
+                    enum: [api, email, webhook]
+                  default: [api]
+                  description: Notification delivery channels
+            examples:
+              priceDropAlert:
+                summary: Price Drop Alert
+                value:
+                  product_id: 550e8400-e29b-41d4-a716-446655440000
+                  target_price: 179.99
+                  alert_type: price_drop
+                  notification_channels: [api, email]
+      responses:
+        '201':
+          description: Alert created successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  alert:
+                    $ref: '#/components/schemas/Alert'
+        '200':
+          description: Alert updated (if already exists)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                    example: Alert updated
+                  alert:
+                    $ref: '#/components/schemas/Alert'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '429':
+          $ref: '#/components/responses/RateLimitExceeded'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /alerts/drops:
+    get:
+      tags:
+        - Alerts
+      summary: Get Price Drops
+      description: Get products with recent price drops
+      operationId: getPriceDrops
+      parameters:
+        - name: min_discount
+          in: query
+          description: Minimum discount percentage
+          schema:
+            type: integer
+            minimum: 0
+            maximum: 100
+            default: 10
+        - name: time_range
+          in: query
+          description: Time range to check
+          schema:
+            type: string
+            enum: [1h, 6h, 12h, 24h, 48h, 7d]
+            default: 24h
+      responses:
+        '200':
+          description: List of products with price drops
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  products:
+                    type: array
+                    items:
+                      allOf:
+                        - $ref: '#/components/schemas/Product'
+                        - type: object
+                          properties:
+                            discount_percent:
+                              type: string
+                              example: "25.5"
+                            savings:
+                              type: string
+                              example: "50.00"
+                  count:
+                    type: integer
+                    example: 5
+                  filters:
+                    type: object
+                    properties:
+                      min_discount:
+                        type: integer
+                        example: 10
+                      time_range:
+                        type: string
+                        example: 24h
+                      since:
+                        type: string
+                        format: date-time
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '429':
+          $ref: '#/components/responses/RateLimitExceeded'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+components:
+  schemas:
+    Product:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          example: 550e8400-e29b-41d4-a716-446655440000
+        url:
+          type: string
+          format: uri
+          example: https://www.amazon.com/dp/B08N5WRWNW
+        name:
+          type: string
+          example: Echo Dot (4th Gen) | Smart speaker with Alexa
+        current_price:
+          type: number
+          format: float
+          example: 249.99
+        original_price:
+          type: number
+          format: float
+          example: 299.99
+        lowest_price:
+          type: number
+          format: float
+          example: 199.99
+        highest_price:
+          type: number
+          format: float
+          example: 349.99
+        target_price:
+          type: number
+          format: float
+          nullable: true
+          example: 179.99
+        currency:
+          type: string
+          example: USD
+        store:
+          type: string
+          example: amazon.com
+        image_url:
+          type: string
+          format: uri
+          nullable: true
+          example: https://m.media-amazon.com/images/I/71Q9d6N7xkL._AC_SL1000_.jpg
+        in_stock:
+          type: boolean
+          example: true
+        notify_on_drop:
+          type: boolean
+          example: false
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+    PriceHistory:
+      type: object
+      properties:
+        price:
+          type: number
+          format: float
+          example: 249.99
+        in_stock:
+          type: boolean
+          example: true
+        created_at:
+          type: string
+          format: date-time
+
+    Alert:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        product_id:
+          type: string
+          format: uuid
+        target_price:
+          type: number
+          format: float
+          example: 179.99
+        alert_type:
+          type: string
+          enum: [price_drop, back_in_stock, any_change]
+        notification_channels:
+          type: array
+          items:
+            type: string
+        is_active:
+          type: boolean
+          example: true
+        created_at:
+          type: string
+          format: date-time
+
+    Error:
+      type: object
+      properties:
+        error:
+          type: string
+          description: Error message
+          example: Invalid request
+        message:
+          type: string
+          description: Detailed error message
+          example: The provided URL is not valid
+        details:
+          type: object
+          description: Additional error details
+        request_id:
+          type: string
+          description: Unique request identifier for debugging
+          example: req_abc123xyz
+        timestamp:
+          type: string
+          format: date-time
+
+    ValidationError:
+      type: object
+      properties:
+        error:
+          type: string
+          example: Validation error
+        details:
+          type: array
+          items:
+            type: object
+            properties:
+              field:
+                type: string
+                example: url
+              message:
+                type: string
+                example: Invalid URL format
+              code:
+                type: string
+                example: invalid_string
+
+  responses:
+    BadRequest:
+      description: Bad request - Invalid input data
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ValidationError'
+    
+    Unauthorized:
+      description: Unauthorized - Missing or invalid API key
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              error:
+                type: string
+                example: Unauthorized
+              message:
+                type: string
+                example: Missing X-RapidAPI-Key header
+    
+    NotFound:
+      description: Resource not found
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              error:
+                type: string
+                example: Product not found
+    
+    RateLimitExceeded:
+      description: Rate limit exceeded
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              error:
+                type: string
+                example: Rate limit exceeded
+              message:
+                type: string
+                example: "Plan: free, Limit: 100/day"
+              retry_after:
+                type: integer
+                description: Seconds until rate limit resets
+                example: 3600
+    
+    InternalServerError:
+      description: Internal server error
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              error:
+                type: string
+                example: Internal server error
+              message:
+                type: string
+                example: An unexpected error occurred
+              request_id:
+                type: string
+                example: req_xyz789
+
+  securitySchemes:
+    RapidAPIKey:
+      type: apiKey
+      in: header
+      name: X-RapidAPI-Key
+      description: Your RapidAPI key for authentication
+    
+    RapidAPIHost:
+      type: apiKey
+      in: header
+      name: X-RapidAPI-Host
+      description: RapidAPI host (pricedropapi.p.rapidapi.com)
+
+security:
+  - RapidAPIKey: []
+    RapidAPIHost: []
+
+externalDocs:
+  description: Full API Documentation
+  url: https://pricedrop-api.vercel.app/docs
