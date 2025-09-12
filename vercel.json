@@ -23,7 +23,7 @@
   "crons": [
     {
       "path": "/api/cron/check-prices",
-      "schedule": "0 0 * * *"
+      "schedule": "0 * * * *"
     }
   ]
 }
