@@ -1,0 +1,18 @@
+name: Vercel Scheduler
+
+on:
+  schedule:
+    - cron: '0 * * * *'  # runs at minute 0 of every hour
+  workflow_dispatch:      # optional, allows manual triggering
+
+jobs:
+  call-vercel-api:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Make request to Vercel API
+        run: |
+          curl -X POST https://your-app.vercel.app/api/alerts/create \
+            -H "Authorization: Bearer ${{ secrets.VERCEL_TOKEN }}" \
+            -H "Content-Type: application/json" \
+            -d '{"data":"example"}'
+

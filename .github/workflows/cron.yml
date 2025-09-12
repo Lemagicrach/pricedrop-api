@@ -1,0 +1,17 @@
+name: Scheduled Alert Job
+
+on:
+  schedule:
+    - cron: "0 * * * *"   # runs every hour (UTC)
+  workflow_dispatch:      # allow manual trigger from Actions tab
+
+jobs:
+  call-api:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Call alerts API
+        run: |
+          curl -X POST https://your-app.com/api/alerts/create \
+            -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" \
+            -H "Content-Type: application/json" \
+            -d '{"product_id":"123", "target_price":100, "alert_type":"below", "notification_channels":["email"]}'

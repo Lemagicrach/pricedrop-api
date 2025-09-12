@@ -22,8 +22,8 @@
   ],
   "crons": [
     {
-      "path": "/api/alerts/create",
-      "schedule": "0 0 * * *"
+      "path": "/api/cron/check-prices",
+      "schedule": "0 * * * *"
     }
   ]
 }
