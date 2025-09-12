@@ -1,6 +1,6 @@
 {
   "name": "pricedrop-api",
-  "version": "1.0.2",
+  "version": "1.0.0",
   "description": "Price tracking and monitoring API with RapidAPI integration",
   "scripts": {
     "dev": "vercel dev",
