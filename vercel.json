@@ -3,9 +3,7 @@
     "api/*.js": {
       "maxDuration": 10
     },
-    "api/track.js": {
-      "maxDuration": 30
-    },
+  
     "api/cron/*.js": {
       "maxDuration": 60
     }
