@@ -12,7 +12,7 @@ jobs:
       - name: Make request to Vercel API
         run: |
           curl -X POST https://your-app.vercel.app/api/alerts/create \
-            -H "Authorization: Bearer ${{ secrets.VERCEL_TOKEN }}" \
+            -H "Authorization: Bearer {{ secrets.VERCEL_TOKEN }}" \
             -H "Content-Type: application/json" \
             -d '{"data":"example"}'
 
