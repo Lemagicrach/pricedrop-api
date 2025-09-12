@@ -29,6 +29,10 @@ export default async function handler(req, res) {
 
   let rapidApiData;
   
+  if (req.headers['x-some-secret'] !== process.env.SOME_SECRET) {
+  return res.status(404).json({ error: 'Not Found' });
+}
+
   try {
     // Verify RapidAPI authentication
     rapidApiData = verifyRapidAPI(req);
