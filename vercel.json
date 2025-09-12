@@ -20,8 +20,12 @@
       ]
     }
   ],
-  "crons": [{
-    "path": "/api/cron",
-    "schedule": "0 10 * * *"
-  }]
+  "crons": [
+    {
+      "path": "/api/alerts/create",
+      "schedule": "0 0 * * *"
+    }
+  ]
 }
+
+

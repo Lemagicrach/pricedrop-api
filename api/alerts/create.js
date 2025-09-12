@@ -5,7 +5,10 @@ import { createAlertSchema } from '../../lib/validators';
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, X-RapidAPI-Key, X-RapidAPI-Host');
+  res.setHeader(
+    'Access-Control-Allow-Headers',
+    'Content-Type, X-RapidAPI-Key, X-RapidAPI-Host, Authorization'
+  );
 
   if (req.method === 'OPTIONS') {
     return res.status(200).end();
@@ -15,13 +18,19 @@ export default async function handler(req, res) {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
+  // 🔒 Cron authorization check
+  if (req.headers.authorization !== `Bearer ${process.env.CRON_SECRET}`) {
+    return res.status(401).json({ error: 'Unauthorized' });
+  }
+
   try {
     const rapidApiKey = verifyRapidAPI(req);
     await checkRateLimit(rapidApiKey);
 
     // Validate input
     const validatedData = createAlertSchema.parse(req.body);
-    const { product_id, target_price, alert_type, notification_channels } = validatedData;
+    const { product_id, target_price, alert_type, notification_channels } =
+      validatedData;
 
     // Verify product belongs to user
     const { data: product } = await supabase
@@ -52,7 +61,7 @@ export default async function handler(req, res) {
           target_price,
           alert_type,
           notification_channels,
-          updated_at: new Date().toISOString()
+          updated_at: new Date().toISOString(),
         })
         .eq('id', existing.id)
         .select()
@@ -63,7 +72,7 @@ export default async function handler(req, res) {
       return res.status(200).json({
         success: true,
         message: 'Alert updated',
-        alert
+        alert,
       });
     }
 
@@ -76,7 +85,7 @@ export default async function handler(req, res) {
         alert_type,
         notification_channels,
         rapidapi_key: rapidApiKey,
-        is_active: true
+        is_active: true,
       })
       .select()
       .single();
@@ -85,22 +94,21 @@ export default async function handler(req, res) {
 
     res.status(201).json({
       success: true,
-      alert
+      alert,
     });
-
   } catch (error) {
     console.error('Alert creation error:', error);
-    
+
     if (error.name === 'ZodError') {
       return res.status(400).json({
         error: 'Validation error',
-        details: error.errors
+        details: error.errors,
       });
     }
 
     res.status(500).json({
       error: 'Failed to create alert',
-      message: error.message
+      message: error.message,
     });
   }
 }
