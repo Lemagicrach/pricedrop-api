@@ -12,6 +12,6 @@ jobs:
       - name: Call alerts API
         run: |
           curl -X POST https://your-app.com/api/alerts/create \
-            -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" \
+            -H "Authorization: Bearer {{ secrets.CRON_SECRET }}" \
             -H "Content-Type: application/json" \
             -d '{"product_id":"123", "target_price":100, "alert_type":"below", "notification_channels":["email"]}'
