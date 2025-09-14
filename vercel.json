@@ -1,7 +1,5 @@
 {
   "version": 2,
-  "name": "pricedrop-api",
-  "description": "Professional price tracking and monitoring API",
   "functions": {
     "api/**/*.js": {
       "runtime": "nodejs18.x",
