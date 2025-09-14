@@ -1,7 +1,7 @@
-import { supabase } from '../lib/supabase';
-import { verifyRapidAPI, checkRateLimit } from '../lib/rapidapi';
-import { trackProductSchema, validateUrl } from '../lib/validators';
-import { scrapePrice } from '../lib/scraper';
+import { supabase } from '../../lib/supabase';
+import { verifyRapidAPI, checkRateLimit } from '../../lib/rapidapi';
+import { trackProductSchema, validateUrl } from '../../lib/validators';
+import { scrapePrice } from '../../lib/scraper';
 
 // Response helper
 const sendResponse = (res, status, data, error = null) => {
