@@ -1,4 +1,5 @@
 {
+  "outputDirectory": ".next",
   "version": 2,
   "functions": {
     "api/*.js": {
