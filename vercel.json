@@ -1,5 +1,5 @@
 {
-  "outputDirectory": "pricedrop-api@1.0.0",
+  "outputDirectory": ".next",
   "version": 2,
   "functions": {
     "api/*.js": {

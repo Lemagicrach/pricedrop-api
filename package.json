@@ -7,7 +7,7 @@
     "dev": "vercel dev",
     "deploy": "vercel --prod",
     "test": "node scripts/test-endpoints.js",
-    "build": "echo 'No build step required for serverless functions'",
+    "build": "[my-framework] build --output public",
     "start": "vercel dev",
     "lint": "echo 'Linting not configured'",
     "format": "echo 'Formatting not configured'"
