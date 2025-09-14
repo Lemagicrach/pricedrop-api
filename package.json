@@ -7,7 +7,7 @@
     "dev": "vercel dev",
     "deploy": "vercel --prod",
     "test": "node scripts/test-endpoints.js",
-    "build": "[my-framework] build --output public",
+    "build": "[.next] build --output public",
     "start": "vercel dev",
     "lint": "echo 'Linting not configured'",
     "format": "echo 'Formatting not configured'"
