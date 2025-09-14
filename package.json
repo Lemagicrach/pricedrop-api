@@ -10,12 +10,12 @@
     "build": "next build",
     "start": "vercel dev",
     "lint": "echo 'Linting not configured'",
-    "format": "echo 'Formatting not configured'"
-  },
-  "engines": {
-    "node": ">=18.0.0"
-  },
-  "dependencies": {
+  "format": "echo 'Formatting not configured'"
+},
+"engines": {
+  "node": ">=18.0.0"
+},
+"dependencies": {
     "axios": "^1.11.0",
     "cheerio": "^1.1.2",
     "cors": "^2.8.5",
