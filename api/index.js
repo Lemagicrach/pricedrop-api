@@ -18,23 +18,34 @@ module.exports = function handler(req, res) {
     success: true,
     message: '🎉 PriceDrop API is Live!',
     status: 'operational',
-    version: '1.0.0',
+    version: '1.1.0',
     timestamp: new Date().toISOString(),
     endpoints: {
       health: `${baseUrl}/api/health`,
       stores: `${baseUrl}/api/stores`,
       price_check: `${baseUrl}/api/price-check`,
-      track: `${baseUrl}/api/track`
+      track: `${baseUrl}/api/track`,
+      ebay_search: `${baseUrl}/api/ebay-search`,  // NEW - Working
+      amazon_affiliate: `${baseUrl}/api/amazon-affiliate`  // NEW - Working
+    },
+    current_status: {
+      ebay: 'Sandbox API working, Production pending approval',
+      amazon: 'Affiliate links only (PA-API requires 3 sales)',
+      scraping: 'Disabled - Sites block after 5-10 requests'
     },
     features: {
-      supported_stores: ['amazon.com', 'amazon.co.uk', 'bestbuy.com', 'walmart.com', 'target.com'],
-      real_time_pricing: true,
-      price_tracking: true,
-      email_alerts: true,
-      api_rate_limiting: true
+      ebay_product_search: true,  // Actually works
+      amazon_affiliate_links: true,  // Actually works
+      real_time_pricing: false,  // Honest - scraping doesn't work
+      price_tracking: false,  // Not implemented yet
+      email_alerts: false,  // Not implemented yet
+      api_rate_limiting: true  // Basic implementation exists
+    },
+    usage: {
+      ebay_search: 'GET /api/ebay-search?keywords=phone&limit=10',
+      amazon_link: 'GET /api/amazon-affiliate?keywords=laptop'
     },
     documentation: 'https://github.com/Lemagicrach/pricedrop-api',
-    support: 'https://rapidapi.com/pricedrop/api/pricedrop'
+    note: 'Currently using eBay Sandbox data. Production access pending.'
   });
 };
-
