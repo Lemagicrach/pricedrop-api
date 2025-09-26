@@ -14,10 +14,12 @@ module.exports = async (req, res) => {
     });
   }
 
-  const ebay = new eBayAPI(
-     process.env.EBAY_PRODUCTION_APP_ID,
-    'production'
-  );
+  const isProduction = process.env.NODE_ENV === 'production';
+
+const ebay = new eBayAPI(
+  isProduction ? process.env.EBAY_PRODUCTION_APP_ID : process.env.EBAY_SANDBOX_APP_ID,
+  isProduction ? 'production' : 'sandbox'
+);
   
   const results = await ebay.searchProducts(keywords, limit);
   
