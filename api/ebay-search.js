@@ -13,11 +13,10 @@ module.exports = async (req, res) => {
       error: 'Keywords parameter required'
     });
   }
-  
-  // Use sandbox for now, switch to production when approved
+
   const ebay = new eBayAPI(
-    process.env.EBAY_SANDBOX_APP_ID,
-    'sandbox'
+     process.env.EBAY_PRODUCTION_APP_ID,
+    'production'
   );
   
   const results = await ebay.searchProducts(keywords, limit);
