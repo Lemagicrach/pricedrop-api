@@ -29,7 +29,7 @@ module.exports = function handler(req, res) {
       amazon_affiliate: `${baseUrl}/api/amazon-affiliate`  // NEW - Working
     },
     current_status: {
-      ebay: 'Sandbox API working, Production pending approval',
+      ebay: 'Sandbox API working, Production API working',
       amazon: 'Affiliate links only (PA-API requires 3 sales)',
       scraping: 'Disabled - Sites block after 5-10 requests'
     },
@@ -46,6 +46,6 @@ module.exports = function handler(req, res) {
       amazon_link: 'GET /api/amazon-affiliate?keywords=laptop'
     },
     documentation: 'https://github.com/Lemagicrach/pricedrop-api',
-    note: 'Currently using eBay Sandbox data. Production access pending.'
+    note: 'Currently using eBay Sandbox data and Production data.'
   });
 };

@@ -25,7 +25,7 @@ const ebay = new eBayAPI(
   
   res.json({
     ...results,
-    environment: 'sandbox',
-    note: 'Using sandbox data until production keys approved'
+    environment: 'production',
+    note: 'Using production data from eBay API'
   });
 };
