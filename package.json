@@ -4,10 +4,11 @@
   "description": "Professional price tracking and monitoring API with RapidAPI integration",
   "main": "api/index.js",
   "scripts": {
-    "dev": "vercel dev",
+    "dev": "node api/index.js",
+    "start": "node api/index.js",
     "deploy": "vercel --prod",
     "test": "node scripts/test-endpoints.js",
-    "start": "vercel dev"
+    "vercel-dev": "vercel dev"
   },
   "engines": {
     "node": ">=18.0.0"
@@ -37,10 +38,10 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/Lemagicrach/pricedrop-api.git"
+    "url": "https://github.com/yourusername/pricedrop-api.git"
   },
   "homepage": "https://pricedrop-api.vercel.app",
   "bugs": {
-    "url": "https://github.com/Lemagicrach/pricedrop-api/issues"
+    "url": "https://github.com/yourusername/pricedrop-api/issues"
   }
 }
