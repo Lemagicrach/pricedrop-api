@@ -1,55 +1,35 @@
 {
-  
   "version": 2,
-  "functions": {
-    "api/*.js": {
-      "maxDuration": 30
-    }
-  },
-  "rewrites": [
+  "builds": [
     {
-      "source": "/",
-      "destination": "/api/index"
-    },
-    {
-      "source": "/health",
-      "destination": "/api/health"
-    },
-    {
-      "source": "/docs",
-      "destination": "/api/index"
+      "src": "api/**/*.js",
+      "use": "@vercel/node"
     }
   ],
   "headers": [
     {
       "source": "/api/(.*)",
       "headers": [
-        {
-          "key": "Access-Control-Allow-Origin",
-          "value": "*"
-        },
-        {
-          "key": "Access-Control-Allow-Methods",
-          "value": "GET, POST, OPTIONS"
-        },
-        {
-          "key": "Access-Control-Allow-Headers",
-          "value": "Content-Type, X-RapidAPI-Key, X-API-Key"
-        },
-        {
-          "key": "X-Content-Type-Options",
-          "value": "nosniff"
-        },
-        {
-          "key": "X-Frame-Options",
-          "value": "DENY"
-        },
-        {
-          "key": "X-XSS-Protection",
-          "value": "1; mode=block"
-        }
+        { "key": "Access-Control-Allow-Origin", "value": "*" },
+        { "key": "Access-Control-Allow-Methods", "value": "GET,POST,PUT,DELETE,OPTIONS" },
+        { "key": "Access-Control-Allow-Headers", "value": "X-RapidAPI-Key,X-RapidAPI-Host,Content-Type,Authorization" },
+        { "key": "Access-Control-Max-Age", "value": "86400" }
       ]
     }
-  ]
+  ],
+  "rewrites": [
+    {
+      "source": "/api",
+      "destination": "/api/v1"
+    },
+    {
+      "source": "/api/v1",
+      "destination": "/api/v1/index"
+    }
+  ],
+  "functions": {
+    "api/v1/**/*.js": {
+      "maxDuration": 10
+    }
+  }
 }
-

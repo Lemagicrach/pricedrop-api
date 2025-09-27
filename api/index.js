@@ -1,51 +1,92 @@
-const { HTTP_STATUS } = require('../config/constants');
+// api/v1/index.js - Main API documentation
+const { withCORS } = require('../../lib/middleware');
 
-module.exports = function handler(req, res) {
-  // Set CORS headers
-  res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
-  
-  if (req.method === 'OPTIONS') {
-    return res.status(HTTP_STATUS.OK).end();
-  }
-  
-  const host = req.headers.host;
+module.exports = withCORS(async (req, res) => {
+  const host = req.headers.host || 'your-api.vercel.app';
   const protocol = req.headers['x-forwarded-proto'] || 'https';
   const baseUrl = `${protocol}://${host}`;
   
-  res.status(HTTP_STATUS.OK).json({
+  res.status(200).json({
     success: true,
-    message: '🎉 PriceDrop API is Live!',
+    message: '🎉 PriceDrop API v1.0 - Ready for RapidAPI!',
+    version: '1.0.0',
     status: 'operational',
-    version: '1.1.0',
     timestamp: new Date().toISOString(),
+    
+    rapidapi: {
+      configured: true,
+      headers_required: ['X-RapidAPI-Key', 'X-RapidAPI-Host'],
+      test_endpoint: `${baseUrl}/api/v1/core/health`
+    },
+    
     endpoints: {
-      health: `${baseUrl}/api/health`,
-      stores: `${baseUrl}/api/stores`,
-      price_check: `${baseUrl}/api/price-check`,
-      track: `${baseUrl}/api/track`,
-      ebay_search: `${baseUrl}/api/ebay-search`,  // NEW - Working
-      amazon_affiliate: `${baseUrl}/api/amazon-affiliate`  // NEW - Working
+      // Core endpoints
+      health: {
+        path: '/api/v1/core/health',
+        method: 'GET',
+        description: 'Health check endpoint',
+        auth_required: false
+      },
+      status: {
+        path: '/api/v1/core/status',
+        method: 'GET',
+        description: 'Service status and metrics',
+        auth_required: false
+      },
+      
+      // Product endpoints
+      product_search: {
+        path: '/api/v1/products/search',
+        method: 'GET',
+        params: '?keywords=laptop&limit=10',
+        description: 'Search products across platforms',
+        auth_required: true
+      },
+      product_track: {
+        path: '/api/v1/products/track',
+        method: 'POST',
+        body: { url: 'product_url', target_price: 199.99 },
+        description: 'Track product prices',
+        auth_required: true
+      },
+      product_compare: {
+        path: '/api/v1/products/compare',
+        method: 'POST',
+        body: { keywords: 'product name' },
+        description: 'Compare prices across platforms',
+        auth_required: true
+      },
+      
+      // Price endpoints
+      price_check: {
+        path: '/api/v1/prices/check',
+        method: 'POST',
+        body: { url: 'product_url' },
+        description: 'Check current price',
+        auth_required: true
+      },
+      price_history: {
+        path: '/api/v1/prices/history',
+        method: 'GET',
+        params: '?product_id=123&days=30',
+        description: 'Get price history',
+        auth_required: true
+      },
+      
+      // Affiliate endpoints
+      affiliate_generate: {
+        path: '/api/v1/affiliate/generate',
+        method: 'POST',
+        body: { urls: ['url1', 'url2'] },
+        description: 'Generate affiliate links',
+        auth_required: true
+      }
     },
-    current_status: {
-      ebay: 'Sandbox API working, Production API working',
-      amazon: 'Affiliate links only (PA-API requires 3 sales)',
-      scraping: 'Disabled - Sites block after 5-10 requests'
-    },
-    features: {
-      ebay_product_search: true,  // Actually works
-      amazon_affiliate_links: true,  // Actually works
-      real_time_pricing: false,  // Honest - scraping doesn't work
-      price_tracking: false,  // Not implemented yet
-      email_alerts: false,  // Not implemented yet
-      api_rate_limiting: true  // Basic implementation exists
-    },
-    usage: {
-      ebay_search: 'GET /api/ebay-search?keywords=phone&limit=10',
-      amazon_link: 'GET /api/amazon-affiliate?keywords=laptop'
-    },
-    documentation: 'https://github.com/Lemagicrach/pricedrop-api',
-    note: 'Currently using eBay Sandbox data and Production data.'
+    
+    documentation: {
+      rapidapi: 'https://rapidapi.com/pricedrop/api/pricedrop',
+      github: 'https://github.com/yourusername/pricedrop-api',
+      postman: `${baseUrl}/api/v1/core/docs`
+    }
   });
-};
+});
