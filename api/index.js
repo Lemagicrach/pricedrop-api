@@ -1,5 +1,6 @@
 // api/v1/index.js - Main API documentation
-const { withCORS } = require('../../lib/middleware');
+
+const { withCORS } = require('../lib/middleware');
 
 module.exports = withCORS(async (req, res) => {
   const host = req.headers.host || 'your-api.vercel.app';
@@ -24,4 +25,8 @@ module.exports = withCORS(async (req, res) => {
       health: {
         path: '/api/v1/core/health',
         method: 'GET',
-        description: 'Health check endpoint',
+        description: 'Health check endpoint'}
+   },
+  });
+});
+

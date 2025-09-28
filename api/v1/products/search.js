@@ -1,6 +1,6 @@
 // api/v1/products/search.js
 const { withRapidAPI } = require('../../../lib/middleware');
-const eBayAPI = require('../../../lib/ebay-api');
+const eBayAPI = require('../../../lib/ebay');
 
 module.exports = withRapidAPI(async (req, res) => {
   const { 
@@ -21,10 +21,7 @@ module.exports = withRapidAPI(async (req, res) => {
   
   try {
     // Initialize eBay API
-    const ebay = new eBayAPI({
-      appId: process.env.EBAY_APP_ID,
-      environment: 'production'
-    });
+    const ebay = new eBayAPI(process.env.EBAY_APP_ID, 'production');
     
     // Build filters
     const filters = {};
@@ -50,40 +47,8 @@ module.exports = withRapidAPI(async (req, res) => {
         currency: item.price.currency,
         shipping: item.shipping?.cost || 0
       },
-      url: item.url,
-      image: item.image,
-      condition: item.condition,
-      seller: {
-        username: item.seller?.username,
-        feedback: item.seller?.feedback,
-        rating: item.seller?.positive
-      },
-      availability: item.availability,
-      location: item.location
-    }));
-    
-    res.status(200).json({
-      success: true,
-      query: {
-        keywords,
-        filters: { minPrice, maxPrice },
-        sortBy
-      },
-      pagination: {
-        total: results.count,
-        limit: parseInt(limit),
-        returned: formattedResults.length
-      },
-      results: formattedResults,
-      timestamp: new Date().toISOString()
-    });
-    
-  } catch (error) {
-    console.error('Search error:', error);
-    res.status(500).json({
-      success: false,
-      error: 'Search failed',
-      message: error.message
-    });
+     }) 
+    );
   }
 });
+

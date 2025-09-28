@@ -1,5 +1,5 @@
-const { getSupportedStores } = require('../lib/scraper');
-const { SUPPORTED_STORES, HTTP_STATUS, ERROR_CODES } = require('../config/constants');
+const scraper = require('../lib/scraper');
+const { HTTP_STATUS, ERROR_CODES } = require('../config/constants');
 
 module.exports = function handler(req, res) {
   // Set CORS headers
@@ -20,12 +20,16 @@ module.exports = function handler(req, res) {
   }
   
   try {
-    const supportedStores = getSupportedStores();
+    const supportedStores = scraper.getSupportedStores();
     
     // Build detailed store information from config
-    const stores = supportedStores.map(domain => {
-      const storeConfig = SUPPORTED_STORES[domain];
-      return {
+    const stores = supportedStores.reduce((acc, domain) => {
+      const storeConfig = scraper.getStoreConfig(domain);
+
+      if (!storeConfig) {
+        return acc;
+      }
+      acc.push({
         domain,
         name: storeConfig.name,
         currency: storeConfig.currency,
@@ -35,8 +39,11 @@ module.exports = function handler(req, res) {
           availability_check: true,
           real_time_pricing: true
         }
-      };
-    });
+    
+      });
+
+      return acc;
+    }, []);
     
     res.status(HTTP_STATUS.OK).json({
       success: true,
@@ -62,4 +69,3 @@ module.exports = function handler(req, res) {
     });
   }
 };
-

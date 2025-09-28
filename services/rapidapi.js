@@ -1,7 +1,13 @@
-﻿export const verifyRapidAPI = (req) => {
+﻿
+const verifyRapidAPI = (req) => {
   return { apiKey: "demo-key", plan: "free" };
 };
 
-export const checkRateLimit = async (data) => {
+const checkRateLimit = async (data) => {
   return true;
+};
+
+module.exports = {
+  verifyRapidAPI,
+  checkRateLimit
 };
