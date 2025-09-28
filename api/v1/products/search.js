@@ -23,7 +23,7 @@ module.exports = withRapidAPI(async (req, res) => {
     // Initialize eBay API
     const ebay = new eBayAPI(process.env.EBAY_APP_ID, 'production');
     
-    // Build filters
+     // Build filters
     const filters = {};
     if (minPrice) filters.minPrice = minPrice;
     if (maxPrice) filters.maxPrice = maxPrice;
@@ -47,8 +47,31 @@ module.exports = withRapidAPI(async (req, res) => {
         currency: item.price.currency,
         shipping: item.shipping?.cost || 0
       },
-     }) 
-    );
+ 
+      url: item.url,
+      image: item.image,
+      condition: item.condition,
+      seller: item.seller,
+      listing: item.listing
+ }));
+
+    return res.status(200).json({
+      success: true,
+      query: {
+        keywords,
+        limit: Number(limit),
+        sortBy
+      },
+      count: formattedResults.length,
+      items: formattedResults
+    });
+  } catch (error) {
+    console.error('Product search error:', error);
+    return res.status(502).json({
+      success: false,
+      error: 'Failed to search products',
+      message: error.message
+    });
   }
 });
 

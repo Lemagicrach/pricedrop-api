@@ -1,12 +1,14 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 
-const handler = require('../../api/stores');
+
+const handler = require('./stores');
 const {
   HTTP_STATUS,
   ERROR_CODES
-} = require('../../config/constants');
-const scraper = require('../../lib/scraper');
+
+} = require('../config/constants');
+const scraper = require('../lib/scraper');
 
 function createMockRes() {
   return {
