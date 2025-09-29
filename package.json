@@ -4,36 +4,47 @@
   "description": "Professional price tracking and monitoring API with RapidAPI integration",
   "main": "api/index.js",
   "scripts": {
-    "dev": "node api/index.js",
+    "dev": "vercel dev",
     "start": "node api/index.js",
     "deploy": "vercel --prod",
-    "test": "node --test test/monetize.test.js",
+    "test": "node scripts/test-production.js",
     "test:components": "node scripts/test-endpoints.js",
-    "vercel-dev": "vercel dev"
+    "test:local": "NODE_ENV=development node scripts/test-production.js",
+    "db:migrate": "node scripts/migrate-database.js",
+    "cron:test": "node api/cron/check-prices.js",
+    "setup": "npm install && npm run db:migrate"
   },
   "engines": {
     "node": ">=18.0.0"
   },
   "dependencies": {
-    "axios": "^1.11.0",
-    "cheerio": "^1.1.2",
+    "@supabase/supabase-js": "^2.39.0",
+    "@sendgrid/mail": "^8.1.0",
+    "axios": "^1.6.0",
+    "cheerio": "^1.0.0-rc.12",
     "cors": "^2.8.5",
-    "zod": "^3.25.76"
+    "dotenv": "^16.3.1",
+    "nodemailer": "^6.9.7",
+    "zod": "^3.22.4"
   },
   "devDependencies": {
-    "vercel": "^32.0.1"
+    "vercel": "^32.0.1",
+    "@types/node": "^20.10.0"
   },
   "keywords": [
     "price-tracking",
+    "price-monitoring",
+    "e-commerce",
     "rapidapi",
     "web-scraping",
-    "micro-saas",
+    "ebay-api",
+    "amazon-affiliate",
     "serverless",
     "vercel",
-    "e-commerce",
-    "price-monitoring",
     "api",
-    "nodejs"
+    "nodejs",
+    "supabase",
+    "real-time-pricing"
   ],
   "author": "PriceDrop API Team",
   "license": "MIT",
@@ -44,5 +55,14 @@
   "homepage": "https://pricedrop-api.vercel.app",
   "bugs": {
     "url": "https://github.com/yourusername/pricedrop-api/issues"
+  },
+  "rapidapi": {
+    "id": "pricedrop-api",
+    "category": "ecommerce",
+    "collections": [
+      "price-tracking",
+      "web-scraping",
+      "data"
+    ]
   }
 }

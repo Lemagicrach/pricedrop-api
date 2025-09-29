@@ -1,5 +1,5 @@
 // api/v1/prices/history.js - Price history endpoint
-const { withRapidAPI } = require('../../../lib/middleware');
+const { withRapidAPI } = require('../../../../lib/middleware');
 
 // Mock price history data (replace with database)
 const generateMockHistory = (days = 30) => {

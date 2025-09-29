@@ -6,30 +6,28 @@
       "use": "@vercel/node"
     }
   ],
+  "crons": [
+    {
+      "path": "/api/cron/check-prices",
+      "schedule": "0 * * * *"
+    }
+  ],
   "headers": [
     {
       "source": "/api/(.*)",
       "headers": [
         { "key": "Access-Control-Allow-Origin", "value": "*" },
         { "key": "Access-Control-Allow-Methods", "value": "GET,POST,PUT,DELETE,OPTIONS" },
-        { "key": "Access-Control-Allow-Headers", "value": "X-RapidAPI-Key,X-RapidAPI-Host,Content-Type,Authorization" },
-        { "key": "Access-Control-Max-Age", "value": "86400" }
+        { "key": "Access-Control-Allow-Headers", "value": "X-RapidAPI-Key,X-RapidAPI-Host,Content-Type,Authorization" }
       ]
     }
   ],
-  "rewrites": [
-    {
-      "source": "/api",
-      "destination": "/api/v1"
-    },
-    {
-      "source": "/api/v1",
-      "destination": "/api/v1/index"
-    }
-  ],
   "functions": {
-    "api/v1/**/*.js": {
+    "api/**/*.js": {
       "maxDuration": 10
+    },
+    "api/cron/*.js": {
+      "maxDuration": 60
     }
   }
 }
