@@ -52,7 +52,7 @@ module.exports = withRapidAPI(async (req, res) => {
             currency: itemDetails.product.price.currency,
             image: itemDetails.product.images?.[0],
             seller: itemDetails.product.seller
-          };
+               };
         }
       } catch (error) {
         console.log('Could not fetch eBay details, using URL only');
@@ -77,5 +77,65 @@ module.exports = withRapidAPI(async (req, res) => {
         supported: ['ebay.com', 'amazon.com']
       });
     }
+
+    const encodedUrl = Buffer.from(url)
+      .toString('base64')
+      .replace(/=+$/g, '')
+      .replace(/\+/g, '-')
+      .replace(/\//g, '_');
+
+    const trackingId = [platform, productId || encodedUrl]
+      .filter(Boolean)
+      .join(':');
+    const now = new Date().toISOString();
+
+    const parsedTargetPrice = target_price != null ? Number(target_price) : null;
+    const parsedCheckFrequency = check_frequency != null ? Number(check_frequency) : null;
+
+    const alerts = {
+      target_price: Number.isFinite(parsedTargetPrice) ? parsedTargetPrice : null,
+      notify_on_drop: Boolean(notify_on_drop),
+      check_frequency: Number.isFinite(parsedCheckFrequency) ? parsedCheckFrequency : null,
+      user_email: user_email ?? null
+    };
+
+    const trackingEntry = {
+      id: trackingId,
+      url,
+      platform,
+      productId,
+      product: productData,
+      alerts,
+      createdAt: trackedProducts.get(trackingId)?.createdAt || now,
+      updatedAt: now
+    };
+
+    trackedProducts.set(trackingId, trackingEntry);
+
+    if (!priceHistory.has(trackingId)) {
+      priceHistory.set(trackingId, []);
+    }
+
+    if (productData && productData.current_price != null) {
+      priceHistory.get(trackingId).push({
+        price: productData.current_price,
+        currency: productData.currency,
+        checkedAt: now
+      });
+    }
+
+    return res.status(201).json({
+      success: true,
+      message: 'Product tracking initialized',
+      tracking: trackingEntry,
+      history: priceHistory.get(trackingId)
+    });
+  } catch (error) {
+    console.error('Track handler error:', error);
+    return res.status(500).json({
+      success: false,
+      error: 'Failed to track product',
+      message: error.message
+    });
   }
-})
+});
