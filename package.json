@@ -4,7 +4,7 @@
   "description": "Professional price tracking and monitoring API with RapidAPI integration",
   "main": "api/index.js",
   "scripts": {
-    "dev": "vercel dev",
+    "dev": "node -e 'console.log(\"Use vercel dev to run locally\")'",
     "start": "node api/index.js",
     "deploy": "vercel --prod",
     "test": "node scripts/test-production.js",
