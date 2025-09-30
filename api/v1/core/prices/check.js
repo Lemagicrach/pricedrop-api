@@ -1,8 +1,8 @@
 // api/cron/check-prices.js - Scheduled Price Checking
-const { ProductService, PriceHistoryService, AlertService } = require('../../services/supabase');
-const eBayAPI = require('../../lib/ebay');
-const { sendPriceDropEmail } = require('../../services/notifications');
-
+const { ProductService, PriceHistoryService, AlertService } = require('../../../../services/supabase');
+const eBayAPI = require('../../../../lib/ebay');
+const { sendPriceDropEmail } = require('../../../../services/notifications');
+const axios = require('axios');
 // This endpoint will be called by Vercel Cron or GitHub Actions
 module.exports = async (req, res) => {
   // Verify cron secret to prevent unauthorized calls

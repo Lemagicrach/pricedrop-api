@@ -1,5 +1,5 @@
 // api/v1/prices/alerts.js - Price alerts management
-const { withRapidAPI } = require('../../../lib/middleware');
+const { withRapidAPI } = require('../../../../lib/middleware');
 
 // In-memory storage (replace with database)
 const alerts = new Map();
