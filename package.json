@@ -3,7 +3,6 @@
   "version": "1.0.0",
   "description": "Professional price tracking and monitoring API with RapidAPI integration",
   "main": "api/index.js",
-  
   "scripts": {
     "start": "node api/index.js",
     "deploy": "vercel --prod",
@@ -18,7 +17,7 @@
     "node": ">=18.0.0"
   },
   "dependencies": {
-    "@sendgrid/mail": "^8.1.0",
+    "@sendgrid/mail": "^8.1.6",
     "@supabase/supabase-js": "^2.39.0",
     "axios": "^1.6.0",
     "cheerio": "^1.0.0-rc.12",
