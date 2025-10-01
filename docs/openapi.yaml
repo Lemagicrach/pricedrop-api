@@ -58,41 +58,104 @@ tags:
     description: API health and status
 
 paths:
-  /health:
+    /v1/core/health:
     get:
       tags:
         - Health
-      summary: Health Check
-      description: Check if the API is operational
-      operationId: healthCheck
+      summary: Get core service health
+      description: Retrieve health, uptime, and dependency information for the API service.
+      operationId: getCoreHealth
       responses:
         '200':
-          description: API is healthy
+          description: API health details
           content:
             application/json:
               schema:
                 type: object
                 properties:
-                  status:
+                   success:
+                    type: boolean
+                    example: true
+                status:
                     type: string
+                    description: Overall service status derived from dependency checks.
+                    enum:
+                      - healthy
+                      - degraded
                     example: healthy
-                  timestamp:
+                timestamp:
                     type: string
                     format: date-time
-                  version:
+                    example: 2024-01-15T12:34:56.000Z
+                version:
                     type: string
                     example: 1.0.0
-                  service:
+                service:
                     type: string
                     example: PriceDrop API
+                    checks:
+                    type: object
+                    additionalProperties:
+                      type: string
+                    example:
+                      api: operational
+                      database: operational
+                      ebay_api: operational
+                      amazon_api: limited
+                      rapidapi: configured
+                    uptime:
+                    type: object
+                    properties:
+                      seconds:
+                        type: number
+                        example: 45296.78
+                      formatted:
+                        type: string
+                        example: 0d 12h 34m
+                    resources:
+                    type: object
+                    properties:
+                      memory:
+                        type: object
+                        properties:
+                          used:
+                            type: string
+                            example: 123.45 MB
+                          total:
+                            type: string
+                            example: 256.00 MB
+                      cpu:
+                        type: object
+                        description: Raw CPU usage statistics from Node.js `process.cpuUsage()`.
+                    rapidapi:
+                    type: object
+                    properties:
+                      headers_detected:
+                        type: object
+                        properties:
+                          X-RapidAPI-Key:
+                            type: boolean
+                            example: true
+                          X-RapidAPI-Host:
+                            type: boolean
+                            example: false
+                      cors_enabled:
+                        type: boolean
+                        example: true
+                      auth_not_required:
+                        type: boolean
+                        example: true
+                      note:
+                        type: string
+                        example: This endpoint does not require authentication for testing
 
-  /track:
+    /v1/products/track:
     post:
       tags:
         - Products
-      summary: Track Product
-      description: Start tracking a product for price changes
-      operationId: trackProduct
+      summary: Start tracking a product
+      description: Initialize product tracking, price history collection, and alert preferences for a URL.
+      operationId: postTrackProduct
       requestBody:
         required: true
         content:
@@ -105,206 +168,30 @@ paths:
                 url:
                   type: string
                   format: uri
-                  description: Product URL to track
-                  example: https://www.amazon.com/dp/B08N5WRWNW
+                  description: Product URL to track. Currently supports eBay and Amazon links.
+                  example: https://www.ebay.com/itm/165123456789
                 target_price:
                   type: number
                   format: float
-                  description: Target price for alerts (optional)
-                  example: 199.99
+                  nullable: true
+                  description: Desired target price to trigger alerts.
+                  example: 179.99
                 notify_on_drop:
                   type: boolean
-                  description: Enable price drop notifications
-                  default: false
+                  description: Enable price drop notifications for the tracked product.
                   example: true
-            examples:
-              amazon:
-                summary: Amazon Product
-                value:
-                  url: https://www.amazon.com/dp/B08N5WRWNW
-                  target_price: 179.99
-                  notify_on_drop: true
-              bestbuy:
-                summary: Best Buy Product
-                value:
-                  url: https://www.bestbuy.com/site/6428324.p
-                  target_price: 299.99
-                  notify_on_drop: true
+                            check_frequency:
+                  type: integer
+                  description: Number of hours between price checks.
+                  example: 2
+                user_email:
+                  type: string
+                  format: email
+                  description: Email address used for alert notifications when no user account exists.
+                  example: shopper@example.com
       responses:
         '201':
-          description: Product successfully tracked
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  success:
-                    type: boolean
-                    example: true
-                  product:
-                    $ref: '#/components/schemas/Product'
-        '400':
-          $ref: '#/components/responses/BadRequest'
-        '401':
-          $ref: '#/components/responses/Unauthorized'
-        '409':
-          description: Product already being tracked
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  error:
-                    type: string
-                    example: Product already being tracked
-                  product:
-                    $ref: '#/components/schemas/Product'
-        '422':
-          description: Unsupported store
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Error'
-        '429':
-          $ref: '#/components/responses/RateLimitExceeded'
-        '500':
-          $ref: '#/components/responses/InternalServerError'
-
-  /products:
-    get:
-      tags:
-        - Products
-      summary: List Tracked Products
-      description: Get all products being tracked by the authenticated user
-      operationId: listProducts
-      parameters:
-        - name: limit
-          in: query
-          description: Number of products to return
-          schema:
-            type: integer
-            minimum: 1
-            maximum: 100
-            default: 20
-        - name: offset
-          in: query
-          description: Number of products to skip
-          schema:
-            type: integer
-            minimum: 0
-            default: 0
-        - name: sort
-          in: query
-          description: Sort field
-          schema:
-            type: string
-            enum: [created_at, updated_at, current_price, name]
-            default: created_at
-        - name: order
-          in: query
-          description: Sort order
-          schema:
-            type: string
-            enum: [asc, desc]
-            default: desc
-      responses:
-        '200':
-          description: List of tracked products
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  success:
-                    type: boolean
-                    example: true
-                  products:
-                    type: array
-                    items:
-                      $ref: '#/components/schemas/Product'
-                  pagination:
-                    type: object
-                    properties:
-                      total:
-                        type: integer
-                        example: 42
-                      limit:
-                        type: integer
-                        example: 20
-                      offset:
-                        type: integer
-                        example: 0
-                      has_more:
-                        type: boolean
-                        example: true
-        '401':
-          $ref: '#/components/responses/Unauthorized'
-        '429':
-          $ref: '#/components/responses/RateLimitExceeded'
-        '500':
-          $ref: '#/components/responses/InternalServerError'
-
-  /products/{id}:
-    get:
-      tags:
-        - Products
-      summary: Get Product Details
-      description: Get detailed information about a specific tracked product including price history
-      operationId: getProduct
-      parameters:
-        - name: id
-          in: path
-          required: true
-          description: Product ID
-          schema:
-            type: string
-            format: uuid
-      responses:
-        '200':
-          description: Product details with price history
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  success:
-                    type: boolean
-                    example: true
-                  product:
-                    allOf:
-                      - $ref: '#/components/schemas/Product'
-                      - type: object
-                        properties:
-                          price_history:
-                            type: array
-                            items:
-                              $ref: '#/components/schemas/PriceHistory'
-        '401':
-          $ref: '#/components/responses/Unauthorized'
-        '404':
-          $ref: '#/components/responses/NotFound'
-        '429':
-          $ref: '#/components/responses/RateLimitExceeded'
-        '500':
-          $ref: '#/components/responses/InternalServerError'
-    
-    delete:
-      tags:
-        - Products
-      summary: Delete Tracked Product
-      description: Stop tracking a product
-      operationId: deleteProduct
-      parameters:
-        - name: id
-          in: path
-          required: true
-          description: Product ID
-          schema:
-            type: string
-            format: uuid
-      responses:
-        '200':
-          description: Product deleted successfully
+          description: Tracking initialized successfully
           content:
             application/json:
               schema:
@@ -315,40 +202,124 @@ paths:
                     example: true
                   message:
                     type: string
-                    example: Product deleted successfully
-        '401':
-          $ref: '#/components/responses/Unauthorized'
-        '404':
-          $ref: '#/components/responses/NotFound'
-        '429':
-          $ref: '#/components/responses/RateLimitExceeded'
+                    example: Product tracking initialized successfully
+                  tracking:
+                    type: object
+                    properties:
+                      tracking_id:
+                        type: string
+                        example: ebay-165123456789
+                      product_id:
+                        type: string
+                        example: 550e8400-e29b-41d4-a716-446655440000
+                      url:
+                        type: string
+                        format: uri
+                        example: https://www.ebay.com/itm/165123456789
+                      platform:
+                        type: string
+                        example: ebay
+                      external_id:
+                        type: string
+                        nullable: true
+                        example: "165123456789"
+                      status:
+                        type: string
+                        example: active
+                  product:
+                    type: object
+                    description: Product record that was created or reused for tracking.
+                  alerts:
+                    type: object
+                    properties:
+                      enabled:
+                        type: boolean
+                        example: true
+                      target_price:
+                        type: number
+                        nullable: true
+                        example: 179.99
+                      email:
+                        type: string
+                        nullable: true
+                        example: shopper@example.com
+                      check_frequency:
+                        type: string
+                        example: Every 2 hour(s)
+                  price_history:
+                    type: object
+                    properties:
+                      count:
+                        type: integer
+                        example: 3
+                      data:
+                        type: array
+                        items:
+                          type: object
+                        description: Recent price history records, limited to the most recent ten entries.
+                      chart_url:
+                        type: string
+                        example: /v1/core/prices/history?product_id=550e8400-e29b-41d4-a716-446655440000
+                  next_steps:
+                    type: object
+                    properties:
+                      view_product:
+                        type: string
+                        example: /v1/products/550e8400-e29b-41d4-a716-446655440000
+                      update_alert:
+                        type: string
+                        example: /v1/core/prices/alerts?alert_id=alert_123
+                      stop_tracking:
+                        type: string
+                        example: /v1/products/550e8400-e29b-41d4-a716-446655440000/untrack
+        '400':
+          description: Invalid or unsupported tracking request
+          content:
+            application/json:
+              examples:
+                missingUrl:
+                  summary: Product URL missing
+                  value:
+                    success: false
+                    error: Product URL is required
+                    code: MISSING_URL
+                unsupportedPlatform:
+                  summary: Unsupported store URL
+                  value:
+                    success: false
+                    error: Unsupported platform
+                    supported:
+                      - ebay.com
+                      - amazon.com
+                    note: More platforms coming soon!
         '500':
-          $ref: '#/components/responses/InternalServerError'
+          description: Failed to initialize product tracking
+          content:
+            application/json:
+              example:
+                success: false
+                error: Failed to track product
+                message: Unexpected error
+                tip: Make sure your environment variables are configured correctly
 
-  /price/{id}:
+    /v1/products/{id}:
     get:
       tags:
-        - Prices
-      summary: Get Current Price
-      description: Get the current price of a tracked product with optional refresh
-      operationId: getCurrentPrice
+        - Products
+      summary: Get tracked product insights
+      description: Fetch product details and pricing insights for the supplied identifier.
+      operationId: getProductById
       parameters:
         - name: id
           in: path
           required: true
-          description: Product ID
+          description: External marketplace identifier (e.g., eBay item ID) or internal tracking ID.
           schema:
             type: string
-            format: uuid
-        - name: refresh
-          in: query
-          description: Force refresh price from source
-          schema:
-            type: boolean
-            default: false
+            
       responses:
         '200':
-          description: Current price information
+          description: Product details retrieved successfully
           content:
             application/json:
               schema:
@@ -357,43 +328,188 @@ paths:
                   success:
                     type: boolean
                     example: true
-                  price:
-                    type: number
-                    format: float
-                    example: 249.99
-                  currency:
-                    type: string
-                    example: USD
-                  in_stock:
-                    type: boolean
-                    example: true
-                  lowest_price:
-                    type: number
-                    format: float
-                    example: 199.99
-                  highest_price:
-                    type: number
-                    format: float
-                    example: 299.99
-                  last_updated:
+                  product:
+                    type: object
+                    properties:
+                      id:
+                        type: string
+                        example: 165123456789
+                      title:
+                        type: string
+                        example: Limited Edition Gaming Console
+                      price:
+                        type: object
+                        properties:
+                        current:
+                            type: number
+                            example: 249.99
+                      insights:
+                        type: object
+                        properties:
+                          price_competitiveness:
+                            type: string
+                            example: competitive
+                          demand_level:
+                            type: object
+                          seller_reliability:
+                            type: object
+                          best_time_to_buy:
+                            type: object
+                      affiliate_links:
+                        type: object
+                        properties:
+                          ebay:
+                            type: string
+                            example: https://rover.ebay.com/rover/1/711-53200-19255-0/1?...
+                          comparison:
+                            type: string
+                            example: /v1/products/compare?keywords=Limited%20Edition%20Gaming%20Console
+                      related_endpoints:
+                        type: object
+                        properties:
+                          track:
+                            type: string
+                            example: /v1/products/track
+                          history:
+                            type: string
+                            example: /v1/core/prices/history?product_id=165123456789
+                          similar:
+                            type: string
+                            example: /v1/products/search?keywords=Limited%20Edition%20Gaming%20Console
+                  timestamp:
                     type: string
                     format: date-time
-        '401':
-          $ref: '#/components/responses/Unauthorized'
+                    example: 2024-01-15T12:34:56.000Z
+        '400':
+          description: Product identifier missing
+          content:
+            application/json:
+              example:
+                success: false
+                error: Product ID is required
         '404':
-          $ref: '#/components/responses/NotFound'
-        '429':
-          $ref: '#/components/responses/RateLimitExceeded'
+          description: Product not found on the upstream marketplace
+          content:
+            application/json:
+              example:
+                success: false
+                error: Product not found
+                product_id: 165123456789
         '500':
-          $ref: '#/components/responses/InternalServerError'
+          description: Unexpected error retrieving product details
+          content:
+            application/json:
+              example:
+                success: false
+                error: Failed to fetch product details
+                message: Unexpected error
 
-  /alerts/create:
+    /v1/core/prices/alerts:
+      get:
+        tags:
+        - Alerts
+      summary: List price alerts
+      description: Retrieve in-memory price alerts filtered by status or trigger state.
+      operationId: getPriceAlerts
+      parameters:
+        - name: status
+          in: query
+          description: Filter alerts by status.
+          schema:
+            type: string
+                        enum:
+              - all
+              - active
+              - paused
+              - cancelled
+              - triggered
+            default: all
+        - name: triggered
+          in: query
+          description: Filter alerts by triggered state. Accepts `true` or `false`.
+          schema:
+            type: boolean
+           
+      responses:
+        '200':
+          description: List of price alerts
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                    count:
+                    type: integer
+                    example: 1
+                  alerts:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id:
+                          type: string
+                          example: alert_1700000000000_abcd1234
+                        product_url:
+                          type: string
+                          format: uri
+                          example: https://www.ebay.com/itm/165123456789
+                        target_price:
+                          type: number
+                          example: 179.99
+                        alert_type:
+                          type: string
+                          example: price_drop
+                        notification_channels:
+                          type: array
+                          items:
+                            type: string
+                          example:
+                            - api
+                        email:
+                          type: string
+                          nullable: true
+                          example: shopper@example.com
+                        webhook_url:
+                          type: string
+                          nullable: true
+                        status:
+                          type: string
+                          example: active
+                        created_at:
+                          type: string
+                          format: date-time
+                        last_checked:
+                          type: string
+                          nullable: true
+                        triggered:
+                          type: boolean
+                        triggered_at:
+                          type: string
+                          nullable: true
+                        trigger_count:
+                          type: integer
+                          example: 0
+                  summary:
+                    type: object
+                    properties:
+                      total:
+                        type: integer
+                        example: 5
+                      active:
+                        type: integer
+                        example: 3
+                      triggered:
+                        type: integer
+                        example: 1
     post:
       tags:
         - Alerts
-      summary: Create Price Alert
-      description: Create a new price alert for a tracked product
-      operationId: createAlert
+      summary: Create a price alert
+      description: Register a new price alert for a specific product URL and target price.
+      operationId: postPriceAlert
       requestBody:
         required: true
         content:
@@ -401,38 +517,43 @@ paths:
             schema:
               type: object
               required:
-                - product_id
+                - product_url
                 - target_price
               properties:
                 product_id:
                   type: string
-                  format: uuid
-                  description: ID of the tracked product
+                  format: uri
+                  example: https://www.ebay.com/itm/165123456789
                 target_price:
                   type: number
-                  format: float
-                  description: Price threshold for alert
-                  example: 199.99
+                  example: 179.99     
                 alert_type:
                   type: string
-                  enum: [price_drop, back_in_stock, any_change]
+                  enum:
+                    - price_drop
+                    - back_in_stock
+                    - any_change
                   default: price_drop
-                  description: Type of alert
                 notification_channels:
                   type: array
                   items:
                     type: string
-                    enum: [api, email, webhook]
-                  default: [api]
-                  description: Notification delivery channels
-            examples:
-              priceDropAlert:
-                summary: Price Drop Alert
-                value:
-                  product_id: 550e8400-e29b-41d4-a716-446655440000
-                  target_price: 179.99
-                  alert_type: price_drop
-                  notification_channels: [api, email]
+                    enum:
+                      - api
+                      - email
+                      - webhook
+                  default:
+                    - api
+                email:
+                  type: string
+                  format: email
+                  nullable: true
+                  example: shopper@example.com
+                webhook_url:
+                  type: string
+                  format: uri
+                  nullable: true
+                  example: https://example.com/alerts/webhook
       responses:
         '201':
           description: Alert created successfully
@@ -444,10 +565,89 @@ paths:
                   success:
                     type: boolean
                     example: true
+                    message:
+                    type: string
+                    example: Alert created successfully
                   alert:
-                    $ref: '#/components/schemas/Alert'
+                    type: object
+                    properties:
+                      id:
+                        type: string
+                        example: alert_1700000000000_abcd1234
+                      product_url:
+                        type: string
+                        format: uri
+                        example: https://www.ebay.com/itm/165123456789
+                      target_price:
+                        type: number
+                        example: 179.99
+                      alert_type:
+                        type: string
+                        example: price_drop
+                      notification_channels:
+                        type: array
+                        items:
+                          type: string
+                        example:
+                          - api
+                          - email
+                      email:
+                        type: string
+                        nullable: true
+                        example: shopper@example.com
+                      webhook_url:
+                        type: string
+                        nullable: true
+                        example: https://example.com/alerts/webhook
+                      status:
+                        type: string
+                        example: active
+                      created_at:
+                        type: string
+                        format: date-time
+                      last_checked:
+                        type: string
+                        nullable: true
+                      triggered:
+                        type: boolean
+                        example: false
+                      triggered_at:
+                        type: string
+                        nullable: true
+                      trigger_count:
+                        type: integer
+                        example: 0
+        '400':
+          description: Missing required fields when creating an alert
+          content:
+            application/json:
+              example:
+                success: false
+                error: Product URL and target price are required
+    put:
+      tags:
+        - Alerts
+      summary: Update a price alert
+      description: Modify alert settings using the alert identifier provided as a query parameter.
+      operationId: putPriceAlert
+      parameters:
+        - name: alert_id
+          in: query
+          description: Identifier of the alert to update.
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: true
+              description: Fields to update on the alert, such as `status`, `target_price`, or `notification_channels`.
+      responses:
         '200':
-          description: Alert updated (if already exists)
+          description: Alert updated successfully
           content:
             application/json:
               schema:
@@ -458,88 +658,60 @@ paths:
                     example: true
                   message:
                     type: string
-                    example: Alert updated
+                    example: Alert updated successfully
                   alert:
-                    $ref: '#/components/schemas/Alert'
+                    type: object
+                    description: The alert after updates were applied.
         '400':
-          $ref: '#/components/responses/BadRequest'
-        '401':
-          $ref: '#/components/responses/Unauthorized'
-        '404':
-          $ref: '#/components/responses/NotFound'
-        '429':
-          $ref: '#/components/responses/RateLimitExceeded'
-        '500':
-          $ref: '#/components/responses/InternalServerError'
-
-  /alerts/drops:
-    get:
-      tags:
-        - Alerts
-      summary: Get Price Drops
-      description: Get products with recent price drops
-      operationId: getPriceDrops
-      parameters:
-        - name: min_discount
-          in: query
-          description: Minimum discount percentage
-          schema:
-            type: integer
-            minimum: 0
-            maximum: 100
-            default: 10
-        - name: time_range
-          in: query
-          description: Time range to check
-          schema:
-            type: string
-            enum: [1h, 6h, 12h, 24h, 48h, 7d]
-            default: 24h
-      responses:
-        '200':
-          description: List of products with price drops
+          description: Alert identifier missing from the request
           content:
             application/json:
-              schema:
-                type: object
-                properties:
-                  success:
-                    type: boolean
-                    example: true
-                  products:
-                    type: array
-                    items:
-                      allOf:
-                        - $ref: '#/components/schemas/Product'
-                        - type: object
-                          properties:
-                            discount_percent:
-                              type: string
-                              example: "25.5"
-                            savings:
-                              type: string
-                              example: "50.00"
-                  count:
-                    type: integer
-                    example: 5
-                  filters:
-                    type: object
-                    properties:
-                      min_discount:
-                        type: integer
-                        example: 10
-                      time_range:
-                        type: string
-                        example: 24h
-                      since:
-                        type: string
-                        format: date-time
-        '401':
-          $ref: '#/components/responses/Unauthorized'
-        '429':
-          $ref: '#/components/responses/RateLimitExceeded'
-        '500':
-          $ref: '#/components/responses/InternalServerError'
+              example:
+                success: false
+                error: Alert ID is required
+        '404':
+          description: Alert with the supplied identifier does not exist
+          content:
+            application/json:
+              example:
+                success: false
+                error: Alert not found
+    delete:
+      tags:
+        - Alerts
+      summary: Delete a price alert
+      description: Remove a stored alert by identifier.
+      operationId: deletePriceAlert
+      parameters:
+        - name: alert_id
+          in: query
+          description: Identifier of the alert to delete.
+          required: true
+          schema:
+            type: string
+
+      responses:
+        '200':
+          description: Alert deleted successfully
+          content:
+            application/json:
+              example:
+                success: true
+                message: Alert deleted successfully
+        '400':
+          description: Alert identifier missing from the request
+          content:
+            application/json:
+              example:
+                success: false
+                error: Alert ID is required
+        '404':
+          description: Alert with the supplied identifier does not exist
+          content:
+            application/json:
+              example:
+                success: false
+                error: Alert not found
 
 components:
   schemas:
