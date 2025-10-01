@@ -91,6 +91,7 @@ const authenticate = async (req, res) => {
     apiKey: verification.apiKey || apiKey,
     plan,
     limits,
+    user: verification.user,
     request: {
       method: req?.method,
       url: req?.url,
@@ -114,7 +115,8 @@ const authenticate = async (req, res) => {
   req.user = {
     apiKey: verification.apiKey || apiKey,
     plan,
-    limits
+    limits,
+    ...(verification.user ? { id: verification.user.id, email: verification.user.email } : {})
   };
 
   return true;
