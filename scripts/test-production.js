@@ -46,12 +46,73 @@ async function apiCall(method, endpoint, data = null) {
     const response = await axios(config);
     return { success: true, data: response.data, status: response.status };
   } catch (error) {
-    return { 
-      success: false, 
-      error: error.response?.data || error.message,
-      status: error.response?.status 
+      const responseData = error.response?.data;
+    let message;
+
+    const aggregateMessage = Array.isArray(error.errors)
+      ? error.errors
+          .map(err => {
+            if (typeof err?.message === 'string' && err.message.trim().length > 0) {
+              return err.message;
+            }
+            return String(err);
+          })
+          .filter(Boolean)
+          .join('; ')
+      : undefined;
+
+    if (typeof error.message === 'string' && error.message.trim().length > 0 && error.message !== 'Error') {
+      message = error.message;
+    } else if (typeof error.cause?.message === 'string' && error.cause.message.trim().length > 0) {
+      message = error.cause.message;
+    } else if (typeof aggregateMessage === 'string' && aggregateMessage.trim().length > 0) {
+      message = aggregateMessage;
+    } else if (typeof responseData?.message === 'string' && responseData.message.trim().length > 0) {
+      message = responseData.message;
+    } else if (typeof responseData === 'string' && responseData.trim().length > 0) {
+      message = responseData;
+    } else if (responseData !== undefined) {
+      try {
+        message = JSON.stringify(responseData);
+      } catch (stringifyError) {
+        message = String(responseData);
+      }
+    } else if (typeof error.toString === 'function') {
+      message = error.toString();
+    }
+
+    const normalizedMessage =
+      typeof message === 'string' && message.trim().length > 0
+        ? message
+        : 'Unknown error';
+
+    return {
+      success: false,
+      error: normalizedMessage,
+      status: error.response?.status,
+      debug: {
+        responseData,
+        message: error.message,
+        stack: error.stack
+      }
     };
   }
+}
+
+function formatError(error) {
+  if (typeof error === 'string') {
+    return error;
+  }
+
+  if (error && typeof error === 'object') {
+    try {
+      return JSON.stringify(error);
+    } catch (stringifyError) {
+      return String(error);
+    }
+  }
+
+  return String(error);
 }
 
 // Test functions
@@ -77,7 +138,7 @@ async function testHealthEndpoint() {
     return true;
   } else {
     results.failed.push('Health endpoint');
-    console.log(`${colors.red}❌ Health check failed: ${result.error}${colors.reset}`);
+    console.log(`${colors.red}❌ Health check failed: ${formatError(result.error)}${colors.reset}`);
     return false;
   }
 }
@@ -93,7 +154,7 @@ async function testDatabaseConnection() {
     console.log(`${colors.green}✅ Database connected successfully${colors.reset}`);
     return true;
   } else {
-    if (result.error?.includes('Database not configured')) {
+    if (typeof result.error === 'string' && result.error.includes('Database not configured')) {
       results.failed.push('Database connection');
       console.log(`${colors.red}❌ Database not configured - Check SUPABASE_URL and SUPABASE_ANON_KEY${colors.reset}`);
       return false;
@@ -135,7 +196,7 @@ async function testProductTracking() {
     }
   } else {
     results.failed.push('Product tracking');
-    console.log(`${colors.red}❌ Product tracking failed: ${JSON.stringify(result.error)}${colors.reset}`);
+    console.log(`${colors.red}❌ Product tracking failed: ${formatError(result.error)}${colors.reset}`);
     return false;
   }
 }
@@ -164,7 +225,7 @@ async function testPriceHistory() {
     }
   } else {
     results.failed.push('Price history');
-    console.log(`${colors.red}❌ Price history failed: ${result.error}${colors.reset}`);
+    console.log(`${colors.red}❌ Price history failed: ${formatError(result.error)}${colors.reset}`);
     return false;
   }
 }
@@ -192,7 +253,7 @@ async function testAlertCreation() {
     return true;
   } else {
     results.failed.push('Alert creation');
-    console.log(`${colors.red}❌ Alert creation failed: ${result.error}${colors.reset}`);
+    console.log(`${colors.red}❌ Alert creation failed: ${formatError(result.error)}${colors.reset}`);
     return false;
   }
 }
@@ -233,7 +294,7 @@ async function testCronJob() {
     return true;
   } else {
     results.failed.push('Cron job');
-    console.log(`${colors.red}❌ Cron job failed: ${result.error}${colors.reset}`);
+    console.log(`${colors.red}❌ Cron job failed: ${formatError(result.error)}${colors.reset}`);
     return false;
   }
 }
@@ -258,126 +319,3 @@ async function testEbayIntegration() {
   console.log(`${colors.red}❌ eBay integration not working - Check EBAY_APP_ID${colors.reset}`);
   return false;
 }
-
-async function checkEnvironmentVariables() {
-  console.log('\n📍 Checking Environment Variables...');
-  
-  const required = [
-    'SUPABASE_URL',
-    'SUPABASE_ANON_KEY',
-    'EBAY_APP_ID'
-  ];
-  
-  const optional = [
-    'SENDGRID_API_KEY',
-    'FROM_EMAIL',
-    'CRON_SECRET'
-  ];
-  
-  let allRequired = true;
-  
-  for (const key of required) {
-    if (process.env[key]) {
-      console.log(`${colors.green}✅ ${key} is set${colors.reset}`);
-    } else {
-      console.log(`${colors.red}❌ ${key} is missing (REQUIRED)${colors.reset}`);
-      allRequired = false;
-    }
-  }
-  
-  for (const key of optional) {
-    if (process.env[key]) {
-      console.log(`${colors.green}✅ ${key} is set${colors.reset}`);
-    } else {
-      console.log(`${colors.yellow}⚠️ ${key} is missing (optional)${colors.reset}`);
-    }
-  }
-  
-  if (allRequired) {
-    results.passed.push('Environment variables');
-  } else {
-    results.failed.push('Environment variables');
-  }
-  
-  return allRequired;
-}
-
-// Main test runner
-async function runTests() {
-  console.log(`${colors.blue}${'='.repeat(60)}${colors.reset}`);
-  console.log(`${colors.blue}🚀 PriceDrop API Production Readiness Test${colors.reset}`);
-  console.log(`${colors.blue}${'='.repeat(60)}${colors.reset}`);
-  console.log(`Testing against: ${BASE_URL}`);
-  
-  // Check environment variables first
-  const envOk = await checkEnvironmentVariables();
-  
-  if (!envOk) {
-    console.log(`\n${colors.red}⚠️ Missing required environment variables!${colors.reset}`);
-    console.log('Please set them in .env.local or Vercel dashboard\n');
-  }
-  
-  // Run tests
-  await testHealthEndpoint();
-  await testDatabaseConnection();
-  await testEbayIntegration();
-  await testProductTracking();
-  await testPriceHistory();
-  await testAlertCreation();
-  await testCronJob();
-  
-  // Print summary
-  console.log(`\n${colors.blue}${'='.repeat(60)}${colors.reset}`);
-  console.log(`${colors.blue}📊 Test Summary${colors.reset}`);
-  console.log(`${colors.blue}${'='.repeat(60)}${colors.reset}`);
-  
-  console.log(`\n${colors.green}✅ Passed: ${results.passed.length}${colors.reset}`);
-  results.passed.forEach(test => console.log(`   - ${test}`));
-  
-  if (results.warnings.length > 0) {
-    console.log(`\n${colors.yellow}⚠️ Warnings: ${results.warnings.length}${colors.reset}`);
-    results.warnings.forEach(warning => console.log(`   - ${warning}`));
-  }
-  
-  if (results.failed.length > 0) {
-    console.log(`\n${colors.red}❌ Failed: ${results.failed.length}${colors.reset}`);
-    results.failed.forEach(test => console.log(`   - ${test}`));
-  }
-  
-  // Production readiness assessment
-  console.log(`\n${colors.blue}${'='.repeat(60)}${colors.reset}`);
-  console.log(`${colors.blue}🎯 Production Readiness Assessment${colors.reset}`);
-  console.log(`${colors.blue}${'='.repeat(60)}${colors.reset}`);
-  
-  const criticalTests = ['Database connection', 'eBay integration', 'Product tracking'];
-  const criticalPassed = criticalTests.every(test => results.passed.includes(test));
-  
-  if (criticalPassed && results.failed.length === 0) {
-    console.log(`\n${colors.green}✅ API is READY for RapidAPI!${colors.reset}`);
-    console.log('\nNext steps:');
-    console.log('1. Deploy to Vercel: vercel --prod');
-    console.log('2. Run cron job several times to populate data');
-    console.log('3. Test with real products');
-    console.log('4. List on RapidAPI marketplace');
-  } else if (criticalPassed) {
-    console.log(`\n${colors.yellow}⚠️ API is MOSTLY ready but needs some fixes${colors.reset}`);
-    console.log('\nFix these issues before listing:');
-    results.failed.forEach(test => console.log(`- ${test}`));
-  } else {
-    console.log(`\n${colors.red}❌ API is NOT ready for production${colors.reset}`);
-    console.log('\nCritical issues to fix:');
-    criticalTests.forEach(test => {
-      if (!results.passed.includes(test)) {
-        console.log(`- ${test}`);
-      }
-    });
-  }
-  
-  console.log(`\n${colors.blue}${'='.repeat(60)}${colors.reset}\n`);
-}
-
-// Run the tests
-runTests().catch(error => {
-  console.error(`${colors.red}Test runner failed: ${error.message}${colors.reset}`);
-  process.exit(1);
-});
