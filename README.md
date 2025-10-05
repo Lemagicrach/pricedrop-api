@@ -568,7 +568,7 @@ curl -X POST \
 
 - **Documentation**: [Full API Docs](https://pricedrop-api.vercel.app/docs)
 - **RapidAPI**: [Support Portal](https://rapidapi.com/support)
-- **GitHub Issues**: [Report Bug](https://github.com/yourusername/pricedrop-api/issues)
+- **GitHub Issues**: [Report Bug](https://github.com/Lemagicrach/pricedrop-api)
 - **Email**: support@pricedropapi.com
 
 ## 📝 Changelog
