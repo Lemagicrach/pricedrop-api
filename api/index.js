@@ -76,7 +76,7 @@ module.exports = withCORS(async (req, res) => {
       support: {
         email: 'support@pricedrop-api.com',
         documentation: `${baseUrl}/docs`,
-        issues: 'https://github.com/yourusername/pricedrop-api/issues'
+        issues: 'https://github.com/Lemagicrach/pricedrop-api/issues'
       }
     });
   } catch (error) {
