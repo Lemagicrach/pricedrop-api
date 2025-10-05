@@ -1,5 +1,7 @@
 // api/docs.js
-module.exports = (req, res) => {
+const { withRapidAPI } = require('../lib/middleware');
+
+module.exports = withRapidAPI((req, res) => {
   res.json({
     documentation: "PriceDrop API v1.0",
     baseUrl: "https://pricedrop-api-five.vercel.app",
@@ -13,4 +15,5 @@ module.exports = (req, res) => {
       // ... more endpoints
     ]
   });
-};
+
+}, { skipAuth: true });

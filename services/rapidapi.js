@@ -1,4 +1,4 @@
-﻿const { supabase, UserService } = require('./supabase');
+﻿const { supabase, UserService } = require('./database');
 
 const normalizeHeader = (req, name) => {
   if (!req || !req.headers) {

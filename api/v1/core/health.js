@@ -1,7 +1,7 @@
 // api/v1/core/health.js - No auth required for testing
-const { withCORS } = require('../../../lib/middleware');
+const { withRapidAPI } = require('../../../lib/middleware');
 
-module.exports = withCORS(async (req, res) => {
+module.exports = withRapidAPI(async (req, res) => {
   // Check service dependencies
   const checks = {
     api: 'operational',
@@ -47,7 +47,7 @@ module.exports = withCORS(async (req, res) => {
       note: 'This endpoint does not require authentication for testing'
     }
   });
-});
+}, { skipAuth: true });
 
 function formatUptime(seconds) {
   const days = Math.floor(seconds / 86400);

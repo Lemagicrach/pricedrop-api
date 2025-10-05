@@ -1,8 +1,8 @@
 // api/v1/index.js - Main API documentation
 
-const { withCORS } = require('../lib/middleware');
+const { withRapidAPI } = require('../lib/middleware');
 
-module.exports = withCORS(async (req, res) => {
+module.exports = withRapidAPI(async (req, res) => {
   const host = req.headers.host || 'your-api.vercel.app';
   const protocol = req.headers['x-forwarded-proto'] || 'https';
   const baseUrl = `${protocol}://${host}`;
@@ -28,5 +28,5 @@ module.exports = withCORS(async (req, res) => {
         description: 'Health check endpoint'}
    },
   });
-});
+}, { skipAuth: true });
 

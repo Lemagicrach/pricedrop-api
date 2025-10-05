@@ -1,264 +1,214 @@
-// api/v1/products/track.js - Real Product Tracking with Database
-const { withRapidAPI } = require('../../../lib/middleware');
-const { ProductService, PriceHistoryService, TrackingService, UserService } = require('../../../services/supabase');
-const eBayAPI = require('../../../lib/ebay');
-const axios = require('axios');
+// api/v1/products/track.js - Real product tracking with database integration
+const { withCORS, validateRapidAPI } = require('../../lib/middleware');
+const { extractProductInfo } = require('../../services/productScraper');
+const { createProduct, updatePrice } = require('../../services/database');
+const { sendNotification } = require('../../services/notifications');
 
-module.exports = withRapidAPI(async (req, res) => {
-  const { 
-    url,                // Product URL to track
-    target_price,       // Target price for alerts
-    notify_on_drop,     // Enable notifications
-    check_frequency,    // How often to check (hours)
-    user_email         // Email for notifications
-  } = req.body;
-  
-  // Validate required parameters
-  if (!url) {
-    return res.status(400).json({
+module.exports = withCORS(validateRapidAPI(async (req, res) => {
+  if (req.method !== 'POST') {
+    return res.status(405).json({
       success: false,
-      error: 'Product URL is required',
-      code: 'MISSING_URL'
+      error: 'Method not allowed. Use POST.'
     });
   }
-  
+
   try {
-    // Get user from API key
-    const apiKey = req.headers['x-rapidapi-key'] || req.headers['x-api-key'];
-    const { data: user, error: userError } = await UserService.findByApiKey(apiKey);
-    
-    if (userError || !user) {
-      // Create a default user if not found (for demo/testing)
-      // In production, you should have proper user registration
-      const defaultUser = {
-        id: 'demo-user-' + apiKey?.substring(0, 8),
-        email: user_email || 'demo@example.com',
-        api_key: apiKey,
-        plan: 'free'
-      };
-      
-      // For demo purposes, we'll use this default user
-      // In production, implement proper user creation
-    }
-    
-    const userId = user?.id || 'demo-user-id';
-    
-    // Check if product already exists in database
-    let { data: existingProduct, error: findError } = await ProductService.findByUrl(url);
-    
-    let productData = {};
-    let productId;
-    let platform = null;
-    let externalId = null;
-    
-    // Determine platform and fetch product details
-    if (url.includes('ebay.com')) {
-      platform = 'ebay';
-      externalId = url.match(/itm\/(\d+)/)?.[1];
-      
-      if (externalId) {
-        try {
-          const ebay = new eBayAPI(process.env.EBAY_APP_ID, 'production');
-          const itemDetails = await ebay.getProductDetails(externalId);
-          
-          if (itemDetails.success) {
-            productData = {
-              url: url,
-              platform: platform,
-              external_id: externalId,
-              name: itemDetails.product.title,
-              description: itemDetails.product.subtitle,
-              image_url: itemDetails.product.images?.[0],
-              current_price: itemDetails.product.price.current,
-              currency: itemDetails.product.price.currency || 'USD',
-              in_stock: itemDetails.product.quantity?.available > 0,
-              seller_info: {
-                username: itemDetails.product.seller?.userId,
-                feedback: itemDetails.product.seller?.feedback,
-                positive: itemDetails.product.seller?.positive
-              },
-              metadata: {
-                condition: itemDetails.product.condition,
-                location: itemDetails.product.location,
-                shipping: itemDetails.product.shipping
-              }
-            };
-          }
-        } catch (ebayError) {
-          console.error('eBay API error:', ebayError);
-          // Continue with basic data if eBay API fails
-          productData = {
-            url: url,
-            platform: platform,
-            external_id: externalId,
-            name: `eBay Item ${externalId}`,
-            current_price: null
-          };
-        }
-      }
-    } else if (url.includes('amazon.com')) {
-      platform = 'amazon';
-      externalId = url.match(/\/([A-Z0-9]{10})/)?.[1]; // ASIN
-      
-      // For Amazon, we can try to scrape basic info
-      // Note: Amazon scraping is complex and may require proxy rotation
-      productData = {
-        url: url,
-        platform: platform,
-        external_id: externalId,
-        name: `Amazon Product ${externalId}`,
-        currency: 'USD',
-        // Amazon real-time prices would require PA-API or careful scraping
-        current_price: null,
-        metadata: {
-          asin: externalId,
-          note: 'Real-time Amazon prices require PA-API access'
-        }
-      };
-      
-      // Optional: Try basic scraping (may be blocked)
-      if (process.env.ENABLE_SCRAPING === 'true') {
-        try {
-          const response = await axios.get(url, {
-            headers: {
-              'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
-            },
-            timeout: 5000
-          });
-          
-          // Extract title using regex (basic approach)
-          const titleMatch = response.data.match(/<title>([^<]+)<\/title>/);
-          if (titleMatch) {
-            productData.name = titleMatch[1].split(':')[0].trim();
-          }
-        } catch (scrapeError) {
-          console.log('Amazon scraping failed (expected):', scrapeError.message);
-        }
-      }
-    } else {
+    const { 
+      url, 
+      target_price, 
+      notify_on_drop = true, 
+      email,
+      webhook_url,
+      check_frequency = '1h' 
+    } = req.body;
+
+    // Validate required fields
+    if (!url) {
       return res.status(400).json({
         success: false,
-        error: 'Unsupported platform',
-        supported: ['ebay.com', 'amazon.com'],
-        note: 'More platforms coming soon!'
+        error: 'Product URL is required'
       });
     }
+
+    // Extract store from URL
+    const store = extractStoreFromUrl(url);
+    if (!store) {
+      return res.status(400).json({
+        success: false,
+        error: 'Unsupported store. Check /api/stores for supported stores.'
+      });
+    }
+
+    // Get current product information
+    const productInfo = await extractProductInfo(url);
     
+    if (!productInfo.success) {
+      return res.status(400).json({
+        success: false,
+        error: productInfo.error || 'Failed to fetch product information'
+      });
+    }
+
     // Create or update product in database
-    if (existingProduct) {
-      // Update existing product
-      productId = existingProduct.id;
-      
-      // Update price if we have new data
-      if (productData.current_price) {
-        const { error: updateError } = await ProductService.updatePrice(
-          productId,
-          productData.current_price,
-          productData.in_stock
-        );
-        
-        if (updateError) {
-          console.error('Failed to update price:', updateError);
-        }
-      }
-    } else {
-      // Create new product
-      const { data: newProduct, error: createError } = await ProductService.create(productData);
-      
-      if (createError) {
-        // If database is not configured, continue with in-memory tracking
-        console.error('Failed to create product in database:', createError);
-        productId = `temp-${Date.now()}`;
-      } else {
-        productId = newProduct.id;
-        existingProduct = newProduct;
-      }
+    const product = await createProduct({
+      url: url,
+      store: store,
+      title: productInfo.title,
+      current_price: productInfo.price,
+      original_price: productInfo.original_price || productInfo.price,
+      currency: productInfo.currency,
+      image_url: productInfo.image,
+      sku: productInfo.sku,
+      in_stock: productInfo.in_stock,
+      target_price: target_price,
+      notify_on_drop: notify_on_drop,
+      email: email,
+      webhook_url: webhook_url,
+      check_frequency: check_frequency,
+      last_checked: new Date().toISOString(),
+      created_at: new Date().toISOString()
+    });
+
+    // Add to price history
+    await updatePrice(product.id, {
+      price: productInfo.price,
+      timestamp: new Date().toISOString(),
+      in_stock: productInfo.in_stock
+    });
+
+    // Check if we should send an alert
+    if (target_price && productInfo.price <= target_price) {
+      await sendNotification({
+        type: 'price_drop',
+        product: product,
+        current_price: productInfo.price,
+        target_price: target_price,
+        email: email,
+        webhook_url: webhook_url
+      });
     }
-    
-    // Record price history
-    if (productData.current_price && productId && !productId.startsWith('temp-')) {
-      const { error: historyError } = await PriceHistoryService.record(
-        productId,
-        productData.current_price,
-        {
-          currency: productData.currency,
-          in_stock: productData.in_stock,
-          seller_info: productData.seller_info
-        }
-      );
-      
-      if (historyError) {
-        console.error('Failed to record price history:', historyError);
-      }
-    }
-    
-    // Create tracking for this user
-    const trackingSettings = {
-      target_price: target_price ? parseFloat(target_price) : null,
-      alert_enabled: notify_on_drop === true,
-      alert_type: 'price_drop',
-      check_frequency: check_frequency ? parseInt(check_frequency) * 3600 : 3600 // Convert hours to seconds
-    };
-    
-    if (!productId.startsWith('temp-')) {
-      const { data: tracking, error: trackingError } = await TrackingService.create(
-        userId,
-        productId,
-        trackingSettings
-      );
-      
-      if (trackingError && !trackingError.message?.includes('duplicate')) {
-        console.error('Failed to create tracking:', trackingError);
-      }
-    }
-    
-    // Get price history for response
-    let priceHistory = [];
-    if (!productId.startsWith('temp-')) {
-      const { data: history } = await PriceHistoryService.getHistory(productId, 7); // Last 7 days
-      priceHistory = history || [];
-    }
-    
-    // Format response
-    const response = {
+
+    // Calculate price insights
+    const insights = calculatePriceInsights(productInfo);
+
+    res.status(201).json({
       success: true,
-      message: 'Product tracking initialized successfully',
-      tracking: {
-        tracking_id: `${platform}-${externalId || productId}`,
-        product_id: productId,
-        url: url,
-        platform: platform,
-        external_id: externalId,
-        status: 'active'
-      },
-      product: existingProduct || productData,
-      alerts: {
-        enabled: notify_on_drop === true,
-        target_price: target_price ? parseFloat(target_price) : null,
-        email: user_email,
-        check_frequency: `Every ${check_frequency || 1} hour(s)`
-      },
-      price_history: {
-        count: priceHistory.length,
-        data: priceHistory.slice(0, 10), // Return last 10 price points
-        chart_url: `/api/v1/prices/history?product_id=${productId}`
-      },
-      next_steps: {
-        view_product: `/api/v1/products/${productId}`,
-        update_alert: `/api/v1/alerts/update?product_id=${productId}`,
-        stop_tracking: `/api/v1/products/${productId}/untrack`
+      message: 'Product tracking initiated successfully',
+      data: {
+        tracking_id: product.id,
+        product: {
+          url: url,
+          store: store,
+          title: productInfo.title,
+          sku: productInfo.sku,
+          current_price: productInfo.price,
+          original_price: productInfo.original_price,
+          currency: productInfo.currency,
+          discount: productInfo.discount,
+          in_stock: productInfo.in_stock,
+          image_url: productInfo.image,
+          rating: productInfo.rating,
+          review_count: productInfo.review_count
+        },
+        tracking_config: {
+          target_price: target_price,
+          notify_on_drop: notify_on_drop,
+          check_frequency: check_frequency,
+          notification_channels: {
+            email: !!email,
+            webhook: !!webhook_url,
+            api: true
+          }
+        },
+        insights: insights,
+        meta: {
+          created_at: product.created_at,
+          last_checked: product.last_checked,
+          next_check: calculateNextCheck(check_frequency),
+          price_history_url: `/api/v1/prices/history/${product.id}`
+        }
       }
-    };
-    
-    return res.status(201).json(response);
-    
+    });
+
   } catch (error) {
-    console.error('Track handler error:', error);
-    return res.status(500).json({
+    console.error('Track product error:', error);
+    res.status(500).json({
       success: false,
       error: 'Failed to track product',
-      message: error.message,
-      tip: 'Make sure your environment variables are configured correctly'
+      details: process.env.NODE_ENV === 'development' ? error.message : undefined
     });
   }
-});
+}));
+
+// Helper functions
+function extractStoreFromUrl(url) {
+  const storeMap = {
+    'amazon.com': 'amazon',
+    'amazon.co.uk': 'amazon_uk',
+    'ebay.com': 'ebay',
+    'bestbuy.com': 'bestbuy',
+    'walmart.com': 'walmart',
+    'target.com': 'target',
+    'newegg.com': 'newegg'
+  };
+
+  try {
+    const urlObj = new URL(url);
+    const domain = urlObj.hostname.replace('www.', '');
+    
+    for (const [key, value] of Object.entries(storeMap)) {
+      if (domain.includes(key)) {
+        return value;
+      }
+    }
+    return null;
+  } catch {
+    return null;
+  }
+}
+
+function calculatePriceInsights(productInfo) {
+  const insights = {
+    price_status: 'stable',
+    recommendation: 'monitor',
+    savings: null,
+    price_trend: 'unknown'
+  };
+
+  if (productInfo.original_price && productInfo.price < productInfo.original_price) {
+    const savings = productInfo.original_price - productInfo.price;
+    const savingsPercent = ((savings / productInfo.original_price) * 100).toFixed(1);
+    
+    insights.savings = {
+      amount: savings.toFixed(2),
+      percentage: savingsPercent
+    };
+    
+    if (savingsPercent > 30) {
+      insights.price_status = 'excellent_deal';
+      insights.recommendation = 'buy_now';
+    } else if (savingsPercent > 15) {
+      insights.price_status = 'good_deal';
+      insights.recommendation = 'consider_buying';
+    } else {
+      insights.price_status = 'minor_discount';
+      insights.recommendation = 'wait_for_better';
+    }
+  }
+
+  return insights;
+}
+
+function calculateNextCheck(frequency) {
+  const intervals = {
+    '15m': 15 * 60 * 1000,
+    '30m': 30 * 60 * 1000,
+    '1h': 60 * 60 * 1000,
+    '6h': 6 * 60 * 60 * 1000,
+    '12h': 12 * 60 * 60 * 1000,
+    '24h': 24 * 60 * 60 * 1000
+  };
+  
+  const interval = intervals[frequency] || intervals['1h'];
+  return new Date(Date.now() + interval).toISOString();
+}
