@@ -87,6 +87,9 @@ try {
   }
 }
 ```
+## 🛒 Listing on RapidAPI
+
+Ready to share your deployment with the marketplace? Follow the step-by-step checklist in [`docs/RAPIDAPI_LISTING.md`](docs/RAPIDAPI_LISTING.md) to gather assets, configure pricing, import the OpenAPI schema, and run end-to-end tests through RapidAPI before making the listing public.
 
 ## 📚 API Endpoints
 
