@@ -1,7 +1,13 @@
 // api/v1/prices/alerts.js - Price alerts management
 const { withRapidAPI } = require('../../../../lib/middleware');
 
-const { AlertService } = require('../../../../services/database');
+const {
+  createAlert: createAlertRecord,
+  getAlerts: getAlertsForUser,
+  getAlertById,
+  updateAlert: updateAlertRecord,
+  deleteAlert: deleteAlertRecord
+} = require('../../../../services/database');
 
 module.exports = withRapidAPI(async (req, res) => {
   const { method } = req;
@@ -9,13 +15,13 @@ module.exports = withRapidAPI(async (req, res) => {
 
   switch (method) {
     case 'GET':
-      return getAlerts(req, res);
+      return handleGetAlerts(req, res);
     case 'POST':
-      return createAlert(req, res);
+      return handleCreateAlert(req, res);
     case 'PUT':
-      return updateAlert(req, res);
+      return handleUpdateAlert(req, res);
     case 'DELETE':
-      return deleteAlert(req, res);
+      return handleDeleteAlert(req, res);
     default:
       return res.status(405).json({
         success: false,
@@ -87,7 +93,7 @@ function coerceTargetPrice(value) {
 }
 
 // Create new alert
-async function createAlert(req, res) {
+async function handleCreateAlert(req, res) {
   const userId = requireUser(req, res);
   if (!userId) return;
 
@@ -137,9 +143,10 @@ async function createAlert(req, res) {
     trigger_count: 0
   };
   
-  const { data, error } = await AlertService.create(alertPayload);
-
-  if (error) {
+  let createdAlert;
+  try {
+    createdAlert = await createAlertRecord(alertPayload);
+  } catch (error) {
     const message = normalizeSupabaseError(error);
     const status = resolveDatabaseStatus(message);
     return res.status(status).json({
@@ -152,12 +159,12 @@ async function createAlert(req, res) {
   return res.status(201).json({
     success: true,
     message: 'Alert created successfully',
-    alert: data
+    alert: createdAlert
   });
 }
 
 // Get alerts
-async function getAlerts(req, res) {
+async function handleGetAlerts(req, res) {
   const userId = requireUser(req, res);
   if (!userId) return;
 
@@ -167,12 +174,13 @@ async function getAlerts(req, res) {
     ? undefined
     : triggered === true || triggered === 'true';
 
-  const { data, error } = await AlertService.listByUser(userId, {
-    status,
-    triggered: triggeredFilter
-  });
-
-  if (error) {
+  let alerts;
+  try {
+    alerts = await getAlertsForUser(userId, {
+      status,
+      triggered: triggeredFilter
+    });
+  } catch (error) {
     const message = normalizeSupabaseError(error);
     const responseStatus = resolveDatabaseStatus(message);
     return res.status(responseStatus).json({
@@ -182,24 +190,25 @@ async function getAlerts(req, res) {
     });
   }
 
-  const alerts = data || [];
+  const alertList = alerts || [];
 
   const summary = {
-    total: alerts.length,
-    active: alerts.filter(alert => alert.status === 'active').length,
-    triggered: alerts.filter(alert => alert.triggered).length
+    total: alertList.length,
+    active: alertList.filter(alert => alert.status === 'active').length,
+    triggered: alertList.filter(alert => alert.triggered).length
   };
 
   return res.json({
     success: true,
-    count: alerts.length,
-    alerts,
+    count: alertList.length,
+    alerts: alertList,
     summary
   });
 }
 
 // Update alert
-async function updateAlert(req, res) {
+async function handleUpdateAlert(req, res) {
+
  
   const userId = requireUser(req, res);
   if (!userId) return;
@@ -215,10 +224,11 @@ async function updateAlert(req, res) {
   }
 
 
-  const { data: existing, error: existingError } = await AlertService.findById(alert_id);
-
-  if (existingError && !existing) {
-    const message = normalizeSupabaseError(existingError);
+  let existing;
+  try {
+    existing = await getAlertById(alert_id);
+  } catch (error) {
+    const message = normalizeSupabaseError(error);
     const status = resolveDatabaseStatus(message);
     return res.status(status === 503 ? status : 404).json({
       success: false,
@@ -266,9 +276,10 @@ async function updateAlert(req, res) {
 
   updates.updated_at = new Date().toISOString();
 
-  const { data, error } = await AlertService.update(alert_id, updates);
-
-  if (error) {
+    let updatedAlert;
+  try {
+    updatedAlert = await updateAlertRecord(alert_id, updates);
+  } catch (error) {
     const message = normalizeSupabaseError(error);
     const status = resolveDatabaseStatus(message);
     return res.status(status).json({
@@ -281,13 +292,13 @@ async function updateAlert(req, res) {
   return res.json({
     success: true,
     message: 'Alert updated successfully',
-    alert: data
+    alert: updatedAlert
   });
 }
 
 // Delete alert
-async function deleteAlert(req, res) {
-  
+async function handleDeleteAlert(req, res) {
+
   
   const userId = requireUser(req, res);
   if (!userId) return;
@@ -302,10 +313,11 @@ async function deleteAlert(req, res) {
   }
   
 
-  const { data: existing, error: existingError } = await AlertService.findById(alert_id);
-
-  if (existingError && !existing) {
-    const message = normalizeSupabaseError(existingError);
+  let existing;
+  try {
+    existing = await getAlertById(alert_id);
+  } catch (error) {
+    const message = normalizeSupabaseError(error);
     const status = resolveDatabaseStatus(message);
     return res.status(status === 503 ? status : 404).json({
       success: false,
@@ -328,9 +340,9 @@ async function deleteAlert(req, res) {
     });
   }
 
-  const { error } = await AlertService.delete(alert_id);
-
-  if (error) {
+  try {
+    await deleteAlertRecord(alert_id);
+  } catch (error) {
     const message = normalizeSupabaseError(error);
     const status = resolveDatabaseStatus(message);
     return res.status(status).json({

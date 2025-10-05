@@ -98,14 +98,19 @@ async function getProducts(filters = {}) {
 async function updatePrice(productId, priceData) {
   try {
     // Add to price history
+    const historyRecord = {
+      product_id: productId,
+      price: priceData.price,
+      in_stock: priceData.in_stock,
+      recorded_at: priceData.timestamp || new Date().toISOString()
+    };
+
+    if (priceData.currency) {
+      historyRecord.currency = priceData.currency;
+    }
     const { data: history, error: historyError } = await supabase
       .from('price_history')
-      .insert([{
-        product_id: productId,
-        price: priceData.price,
-        timestamp: priceData.timestamp || new Date().toISOString(),
-        in_stock: priceData.in_stock
-      }])
+      .insert([historyRecord])
       .select();
 
     if (historyError) throw historyError;
@@ -138,8 +143,8 @@ async function getPriceHistory(productId, days = 30) {
       .from('price_history')
       .select('*')
       .eq('product_id', productId)
-      .gte('timestamp', startDate.toISOString())
-      .order('timestamp', { ascending: true });
+      .gte('recorded_at', startDate.toISOString())
+      .order('recorded_at', { ascending: true });
 
     if (error) throw error;
 
@@ -185,20 +190,89 @@ async function createAlert(alertData) {
   }
 }
 
-async function getAlerts(userId) {
+async function getAlerts(userId, options = {}) {
+  try {
+     let query = supabase
+      .from('alerts')
+      .select('*')
+      .eq('user_id', userId)
+      .order('created_at', { ascending: false });
+
+    if (options.status && options.status !== 'all') {
+      query = query.eq('status', options.status);
+    }
+
+    if (options.triggered !== undefined) {
+      query = query.eq('triggered', options.triggered);
+    }
+
+    const { data, error } = await query;
+
+
+    if (error) throw error;
+    return data || [];
+  } catch (error) {
+    console.error('Database error:', error);
+    throw error;
+  }
+}
+
+async function getAlertById(alertId) {
   try {
     const { data, error } = await supabase
       .from('alerts')
-      .select('*, products(*)')
-      .eq('user_id', userId)
-      .eq('active', true)
-      .order('created_at', { ascending: false });
+      .select('*')
+      .eq('id', alertId)
+      .single();
+
+    if (error) {
+      if (error.code === 'PGRST116' || /0 rows/.test(error.message || '') || /No rows/.test(error.details || '')) {
+        return null;
+      }
+
+      throw error;
+    }
+
+    return data;
+  } catch (error) {
+     if (error && (error.code === 'PGRST116' || /0 rows/.test(error.message || '') || /No rows/.test(error.details || ''))) {
+      return null;
+    }
+
+    console.error('Database error:', error);
+    throw error;
+  }
+}
+
+async function updateAlert(alertId, updates) {
+  try {
+    const { data, error } = await supabase
+      .from('alerts')
+      .update(updates)
+      .eq('id', alertId)
+      .select()
+      .single();
 
     if (error) throw error;
     return data;
   } catch (error) {
     console.error('Database error:', error);
-    return [];
+    throw error;
+  }
+}
+
+async function deleteAlert(alertId) {
+  try {
+    const { error } = await supabase
+      .from('alerts')
+      .delete()
+      .eq('id', alertId);
+
+    if (error) throw error;
+    return true;
+  } catch (error) {
+    console.error('Database error:', error);
+    throw error;
   }
 }
 
@@ -392,6 +466,9 @@ module.exports = {
   getPriceHistory,
   createAlert,
   getAlerts,
+  getAlertById,
+  updateAlert,
+  deleteAlert,
   triggerAlert,
   searchProducts,
   getPriceDrops,

@@ -1,4 +1,4 @@
-﻿const { supabase, UserService } = require('./database');
+﻿const { supabase, getUserByApiKey } = require('./database');
 
 const normalizeHeader = (req, name) => {
   if (!req || !req.headers) {
@@ -24,25 +24,26 @@ const verifyRapidAPI = async (req) => {
     throw new Error('RapidAPI key missing from request headers.');
   }
 
-  const { data, error } = await UserService.findByApiKey(providedKey.trim());
-
-  if (error) {
-    throw new Error(error.message || 'Unable to validate RapidAPI key against user store.');
+    let user;
+  try {
+    user = await Promise.resolve(getUserByApiKey(providedKey.trim()));
+  } catch (error) {
+    throw new Error(error?.message || 'Unable to validate RapidAPI key against user store.');
   }
 
-  if (!data) {
+  if (!user) {
     throw new Error('Provided RapidAPI key is not recognized.');
   }
 
   return {
-    apiKey: data.api_key,
-    plan: data.plan,
+    apiKey: user.api_key,
+    plan: user.plan,
     user: {
-      id: data.id,
-      email: data.email,
-      plan: data.plan,
-      credits_limit: data.credits_limit,
-      credits_used: data.credits_used
+      id: user.id,
+      email: user.email,
+      plan: user.plan,
+      credits_limit: user.credits_limit,
+      credits_used: user.credits_used
     }
   };
 };

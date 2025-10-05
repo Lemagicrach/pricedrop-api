@@ -1,5 +1,5 @@
 // api/cron/check-prices.js - Scheduled Price Checking
-const { ProductService, PriceHistoryService, AlertService } = require('../../../../services/supabase');
+const { ProductService, AlertService } = require('../../../../services/supabase');
 const eBayAPI = require('../../../../lib/ebay');
 const { sendPriceDropEmail } = require('../../../../services/notifications');
 const axios = require('axios');
@@ -50,20 +50,15 @@ module.exports = async (req, res) => {
         
         let newPrice = null;
         let inStock = true;
-        let additionalData = {};
-        
         // Fetch current price based on platform
         if (product.platform === 'ebay' && product.external_id) {
           try {
             const itemDetails = await ebay.getProductDetails(product.external_id);
-            
+
             if (itemDetails.success && itemDetails.product) {
               newPrice = itemDetails.product.price.current;
               inStock = itemDetails.product.quantity?.available > 0;
-              additionalData = {
-                seller_info: itemDetails.product.seller,
-                shipping_cost: itemDetails.product.shipping?.cost
-              };
+          
             } else {
               console.error(`Failed to get eBay details for ${product.external_id}`);
               continue;
@@ -97,7 +92,8 @@ module.exports = async (req, res) => {
           const { error: updateError } = await ProductService.updatePrice(
             product.id,
             newPrice,
-            inStock
+            inStock,
+            product.currency
           );
           
           if (updateError) {
@@ -111,38 +107,22 @@ module.exports = async (req, res) => {
           
           results.updated++;
           
-          // Record price history
-          await PriceHistoryService.record(product.id, newPrice, {
-            currency: product.currency,
-            in_stock: inStock,
-            ...additionalData
-          });
+         
           
           // Check if price dropped below any target prices
           if (oldPrice && newPrice < oldPrice) {
             console.log(`💰 Price drop detected for ${product.name}: $${oldPrice} → $${newPrice}`);
-            
-            // Create price drop alert
-            const dropPercentage = ((oldPrice - newPrice) / oldPrice * 100).toFixed(1);
-            
+          
+
             // This will check all tracking entries and create alerts
-            const alertData = {
-              product_id: product.id,
-              alert_type: 'price_drop',
-              old_price: oldPrice,
-              new_price: newPrice,
-              message: `Price dropped ${dropPercentage}% for ${product.name}`,
-              metadata: {
-                drop_percentage: dropPercentage,
-                savings: (oldPrice - newPrice).toFixed(2)
-              }
-            };
-            
+           
             // The AlertService will handle finding users who track this product
             // and creating alerts for those whose target price is met
-            const { created } = await AlertService.checkAndCreatePriceDropAlerts();
-            results.alerts += created;
-          }
+            const { created } = await AlertService.checkAndCreatePriceDropAlerts(product, {
+              oldPrice,
+              newPrice,
+              inStock
+            });
         } else {
           // Just update last_checked timestamp
           await ProductService.update(product.id, {
@@ -150,7 +130,8 @@ module.exports = async (req, res) => {
           });
         }
         
-      } catch (productError) {
+      }     
+    } catch (productError) {
         console.error(`Error checking product ${product.id}:`, productError);
         results.errors.push({
           product_id: product.id,
@@ -160,7 +141,7 @@ module.exports = async (req, res) => {
     }
     
     // Process any pending alerts
-    await processAlerts();
+      await processAlerts();
     
     console.log('✅ Price check completed:', results);
     

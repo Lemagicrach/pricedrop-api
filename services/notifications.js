@@ -1,5 +1,5 @@
 
-const sendPriceDropEmail = async (email, product, oldPrice, newPrice) => {
+const sendPriceDropEmail = async (email, product = {}, oldPrice, newPrice) => {
   const nodemailer = require('nodemailer');
 
   const transporter = nodemailer.createTransport({
@@ -12,19 +12,24 @@ const sendPriceDropEmail = async (email, product, oldPrice, newPrice) => {
     }
   });
 
-  const discountPercent = (((oldPrice - newPrice) / oldPrice) * 100).toFixed(0);
-  
-  const mailOptions = {
+  const previousPrice = typeof oldPrice === 'number' ? oldPrice : newPrice;
+  const currentPrice = typeof newPrice === 'number' ? newPrice : previousPrice;
+  const discountPercent = previousPrice
+    ? (((previousPrice - currentPrice) / previousPrice) * 100).toFixed(0)
+    : '0';
+
+    const mailOptions = {
     from: process.env.SMTP_USER,
     to: email,
-    subject: `🔥 Price Drop Alert: ${product.name}`,
+    
+    subject: `🔥 Price Drop Alert: ${product.name || 'Tracked Product'}`,
     html: `
       <h2>Great news! The price dropped for:</h2>
-      <h3>${product.name}</h3>
-      <p><strong>Old Price:</strong> $${oldPrice}</p>
-      <p><strong>New Price:</strong> $${newPrice}</p>
-      <p><strong>You Save:</strong> $${(oldPrice - newPrice).toFixed(2)} (${discountPercent}% off)</p>
-      <p><a href="${product.url}">Buy Now</a></p>
+      <h3>${product.name || 'Tracked Product'}</h3>
+      <p><strong>Old Price:</strong> $${previousPrice}</p>
+      <p><strong>New Price:</strong> $${currentPrice}</p>
+      <p><strong>You Save:</strong> $${(previousPrice - currentPrice).toFixed(2)} (${discountPercent}% off)</p>
+      <p><a href="${product.url || '#'}">Buy Now</a></p>
     `
   };
 
@@ -37,6 +42,64 @@ const sendPriceDropEmail = async (email, product, oldPrice, newPrice) => {
   }
 };
 
+const sendNotification = async (notification = {}) => {
+  const { type } = notification;
+
+  if (!type) {
+    throw new Error('Notification type is required');
+  }
+
+  switch (type) {
+    case 'price_drop': {
+      const {
+        email,
+        product = {},
+        current_price,
+        old_price,
+        previous_price,
+        target_price
+      } = notification;
+
+      const results = {};
+
+      if (email) {
+        const oldPriceValue =
+          typeof old_price === 'number'
+            ? old_price
+            : typeof previous_price === 'number'
+            ? previous_price
+            : typeof product.previous_price === 'number'
+            ? product.previous_price
+            : typeof product.original_price === 'number'
+            ? product.original_price
+            : typeof target_price === 'number'
+            ? target_price
+            : current_price;
+
+        const newPriceValue =
+          typeof current_price === 'number'
+            ? current_price
+            : typeof product.current_price === 'number'
+            ? product.current_price
+            : oldPriceValue;
+
+        results.email = await sendPriceDropEmail(
+          email,
+          product,
+          oldPriceValue,
+          newPriceValue
+        );
+      }
+
+      // Additional notification channels (webhook, SMS, etc.) can be handled here
+      return results;
+    }
+    default:
+      console.warn(`Unsupported notification type: ${type}`);
+      return {};
+  }
+};
 module.exports = {
-  sendPriceDropEmail
+  sendPriceDropEmail,
+  sendNotification
 };
