@@ -93,6 +93,39 @@ async function getProducts(filters = {}) {
     return [];
   }
 }
+// Add to services/database.js
+async function compareProduct(productName, stores = []) {
+  try {
+    let query = supabase
+      .from('products')
+      .select('*')
+      .ilike('title', `%${productName}%`);
+    
+    if (stores.length > 0) {
+      query = query.in('store', stores);
+    }
+    
+    const { data, error } = await query
+      .eq('in_stock', true)
+      .order('current_price', { ascending: true })
+      .limit(10);
+    
+    if (error) throw error;
+    
+    return {
+      best_price: data[0],
+      alternatives: data.slice(1),
+      price_range: {
+        min: Math.min(...data.map(p => p.current_price)),
+        max: Math.max(...data.map(p => p.current_price)),
+        average: data.reduce((sum, p) => sum + p.current_price, 0) / data.length
+      }
+    };
+  } catch (error) {
+    console.error('Comparison error:', error);
+    return null;
+  }
+}
 
 // Price history operations
 // In services/database.js - updatePrice function
@@ -232,6 +265,41 @@ async function predictPricePattern(productId) {
   } catch (error) {
     console.error('Prediction error:', error);
     return { pattern: 'error' };
+  }
+}
+// Add to services/database.js
+async function batchUpdatePrices(updates) {
+  try {
+    // Batch insert price history
+    const historyRecords = updates.map(u => ({
+      product_id: u.productId,
+      price: u.price,
+      in_stock: u.in_stock,
+      recorded_at: new Date().toISOString()
+    }));
+    
+    const { error: historyError } = await supabase
+      .from('price_history')
+      .insert(historyRecords);
+    
+    if (historyError) throw historyError;
+    
+    // Batch update products using RPC function
+    const { error: updateError } = await supabase.rpc('batch_update_products', {
+      updates: updates.map(u => ({
+        id: u.productId,
+        current_price: u.price,
+        in_stock: u.in_stock,
+        last_checked: new Date().toISOString()
+      }))
+    });
+    
+    if (updateError) throw updateError;
+    
+    return { success: true, count: updates.length };
+  } catch (error) {
+    console.error('Batch update error:', error);
+    throw error;
   }
 }
 

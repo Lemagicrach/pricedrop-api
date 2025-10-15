@@ -41,25 +41,7 @@ const sendPriceDropEmail = async (email, product = {}, oldPrice, newPrice) => {
     return false;
   }
 };
-// Add to services/notifications.js
-const sendWebhook = async (webhookUrl, payload) => {
-  const axios = require('axios');
-  
-  try {
-    await axios.post(webhookUrl, {
-      event: 'price_drop',
-      timestamp: new Date().toISOString(),
-      ...payload
-    }, {
-      headers: { 'Content-Type': 'application/json' },
-      timeout: 5000
-    });
-    return true;
-  } catch (error) {
-    console.error('Webhook error:', error);
-    return false;
-  }
-};
+
 
 const sendNotification = async (notification = {}) => {
   const { type } = notification;
@@ -81,55 +63,65 @@ const sendNotification = async (notification = {}) => {
 
       const results = {};
 
+      const oldPriceValue =
+        typeof old_price === 'number'
+          ? old_price
+          : typeof previous_price === 'number'
+          ? previous_price
+          : typeof product.previous_price === 'number'
+          ? product.previous_price
+          : typeof product.original_price === 'number'
+          ? product.original_price
+          : typeof target_price === 'number'
+          ? target_price
+          : current_price;
+
+      const newPriceValue =
+        typeof current_price === 'number'
+          ? current_price
+          : typeof product.current_price === 'number'
+          ? product.current_price
+          : oldPriceValue;
+
+      const previousPriceNum =
+        typeof oldPriceValue === 'number' ? oldPriceValue : parseFloat(oldPriceValue) || 0;
+      const currentPriceNum =
+        typeof newPriceValue === 'number' ? newPriceValue : parseFloat(newPriceValue) || previousPriceNum;
+
+      const discountPercent = previousPriceNum
+        ? (((previousPriceNum - currentPriceNum) / previousPriceNum) * 100).toFixed(0)
+        : '0';
+
       if (email) {
-        const oldPriceValue =
-          typeof old_price === 'number'
-            ? old_price
-            : typeof previous_price === 'number'
-            ? previous_price
-            : typeof product.previous_price === 'number'
-            ? product.previous_price
-            : typeof product.original_price === 'number'
-            ? product.original_price
-            : typeof target_price === 'number'
-            ? target_price
-            : current_price;
-
-        const newPriceValue =
-          typeof current_price === 'number'
-            ? current_price
-            : typeof product.current_price === 'number'
-            ? product.current_price
-            : oldPriceValue;
-
         results.email = await sendPriceDropEmail(
           email,
           product,
-          oldPriceValue,
-          newPriceValue
+          previousPriceNum,
+          currentPriceNum
         );
       }
- 
-  // Add webhook support
-  if (notification.webhook_url) {
-    results.webhook = await sendWebhook(notification.webhook_url, {
-      product: product,
-      old_price: oldPriceValue,
-      new_price: newPriceValue,
-      drop_percentage: discountPercent
-    });
-  }
-  
-  return results;
-}
+
+      // Add webhook support
+      if (notification.webhook_url) {
+        // sendWebhook is expected to be defined elsewhere in the project
+        results.webhook = await sendWebhook(notification.webhook_url, {
+          product: product,
+          old_price: previousPriceNum,
+          new_price: currentPriceNum,
+          drop_percentage: discountPercent
+        });
+      }
+
       // Additional notification channels (webhook, SMS, etc.) can be handled here
+
       return results;
     }
-      default:
+    default:
       console.warn(`Unsupported notification type: ${type}`);
       return {};
   }
 };
+
 module.exports = {
   sendPriceDropEmail,
   sendNotification

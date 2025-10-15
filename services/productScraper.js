@@ -362,6 +362,71 @@ function extractNeweggItem(url) {
   const match = url.match(/Item=([A-Z0-9]+)/);
   return match ? match[1] : null;
 }
+// Add to services/productScraper.js
+async function scrapeWithRetry(scrapeFn, url, maxRetries = 3) {
+  let lastError;
+  
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    try {
+      const result = await scrapeFn(url);
+      
+      if (result.success) {
+        return result;
+      }
+      
+      lastError = result.error;
+    } catch (error) {
+      lastError = error;
+    }
+    
+    if (attempt < maxRetries) {
+      // Exponential backoff: 1s, 2s, 4s
+      const delay = Math.pow(2, attempt - 1) * 1000;
+      console.log(`Retry ${attempt}/${maxRetries} after ${delay}ms`);
+      await new Promise(resolve => setTimeout(resolve, delay));
+    }
+  }
+  
+  return { 
+    success: false, 
+    error: `Failed after ${maxRetries} attempts: ${lastError}` 
+  };
+}
+
+// Update extractProductInfo
+async function extractProductInfo(url) {
+  try {
+    const store = detectStore(url);
+    
+    if (!store) {
+      return { success: false, error: 'Unsupported store URL' };
+    }
+
+    let scrapeFn;
+    switch (store) {
+      case 'ebay':
+        scrapeFn = scrapeEbay;
+        break;
+      case 'amazon':
+      case 'amazon_uk':
+        scrapeFn = scrapeAmazon;
+        break;
+      // ... other cases
+      default:
+        return { success: false, error: 'Store scraper not implemented' };
+    }
+    
+    // Use retry logic
+    return await scrapeWithRetry(scrapeFn, url);
+  } catch (error) {
+    console.error('Scraping error:', error);
+    return { 
+      success: false, 
+      error: 'Failed to extract product information',
+      details: error.message 
+    };
+  }
+}
 
 module.exports = {
   extractProductInfo,
