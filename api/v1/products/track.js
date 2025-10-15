@@ -1,8 +1,8 @@
 // api/v1/products/track.js - Real product tracking with database integration
-const { withCORS, validateRapidAPI } = require('../../lib/middleware');
-const { extractProductInfo } = require('../../services/productScraper');
-const { createProduct, updatePrice } = require('../../services/database');
-const { sendNotification } = require('../../services/notifications');
+const { withCORS, validateRapidAPI } = require('../../../lib/middleware');
+const { extractProductInfo } = require('../../../services/productScraper');
+const { createProduct, updatePrice } = require('../../../services/database');
+const { sendNotification } = require('../../../services/notifications');
 
 module.exports = withCORS(validateRapidAPI(async (req, res) => {
   if (req.method !== 'POST') {

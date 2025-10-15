@@ -806,7 +806,7 @@ components:
           format: date-time
 
 paths:
-    /api:
+  /api:
     get:
       tags:
         - Discovery
@@ -820,7 +820,7 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiOverview'
-    /api/stores:
+  /api/stores:
     get:
       tags:
         - Discovery
@@ -834,7 +834,7 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/StoresResponse'
-    /api/v1/core/health:
+  /api/v1/core/health:
     get:
       tags:
         - Core
@@ -848,7 +848,7 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/HealthResponse'
-    /api/v1/core/status:
+  /api/v1/core/status:
     get:
       tags:
         - Core
@@ -865,7 +865,7 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/StatusResponse'
-    /api/v1/products/search:
+  /api/v1/products/search:
     get:
       tags:
         - Products
@@ -936,7 +936,7 @@ paths:
                     type: string
                     message:
                     type: string
-    /api/v1/products/{id}:
+  /api/v1/products/{id}:
     get:
       tags:
         - Products
@@ -966,7 +966,7 @@ paths:
           description: Product not found
         '500':
           description: Unexpected error
-    /api/v1/products/track:
+  /api/v1/products/track:
     post:
       tags:
         - Products
@@ -1005,7 +1005,7 @@ paths:
           description: Method not allowed
         '500':
           description: Tracking failure
-    /api/v1/products/compare:
+  /api/v1/products/compare:
     post:
       tags:
         - Products
@@ -1038,9 +1038,9 @@ paths:
             description: Missing product query
         '500':
             description: Comparison failure
-    /api/v1/prices/history:
+  /api/v1/prices/history:
 
-    /v1/products/{id}:
+  /v1/products/{id}:
     get:
       tags:
         - Prices
@@ -1085,7 +1085,7 @@ paths:
          description: Missing identifiers
         '500':
           description: Unable to generate history
-    /api/v1/prices/alerts:
+  /api/v1/prices/alerts:
     get:
       tags:
         - Alerts
@@ -1239,7 +1239,7 @@ paths:
           description: Forbidden
         '404':
           description: Alert not found
-    /api/v1/prices/check:
+  /api/v1/prices/check:
     post:
       tags:
         - Prices
@@ -1255,13 +1255,13 @@ paths:
           description: Price check results
           content:
             application/json:
-                            schema:
+              schema:
                 $ref: '#/components/schemas/CronCheckResponse'
         '401':
           description: Unauthorized
         '500':
           description: Price check failed
-    /api/v1/affiliate/generate:
+  /api/v1/affiliate/generate:
     post:
       tags:
         - Affiliate

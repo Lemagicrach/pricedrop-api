@@ -48,11 +48,11 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/yourusername/pricedrop-api.git"
+    "url": "https://github.com/Lemagicrach/pricedrop-api.git"
   },
   "homepage": "https://pricedrop-api.vercel.app",
   "bugs": {
-    "url": "https://github.com/yourusername/pricedrop-api/issues"
+    "url": "https://github.com/Lemagicrach/pricedrop-api/issues"
   },
   "rapidapi": {
     "id": "pricedrop-api",
