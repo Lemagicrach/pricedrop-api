@@ -1,0 +1,889 @@
+openapi: 3.0.3
+info:
+  title: PriceDrop API - Real-Time E-commerce Price Tracking
+  version: 1.0.1
+  description: |
+    ## Professional Price Tracking for E-commerce Platforms
+    
+    PriceDrop API enables developers to monitor product prices across major online retailers, 
+    track price drops, receive instant alerts, and analyze pricing trends with AI-powered insights.
+    
+    ### Key Features
+    
+    - **Real-Time Price Tracking**: Monitor prices across eBay and Amazon with customizable check frequencies
+    - **Intelligent Alerts**: Get notified via email or webhook when prices drop below your target
+    - **Price History Analytics**: Access comprehensive historical data to identify trends and patterns
+    - **AI-Powered Insights**: Demand analysis, seller reliability scoring, and buying recommendations
+    - **Multi-Platform Support**: eBay (live), Amazon (affiliate links), more platforms coming soon
+    
+    ### Use Cases
+    
+    - Build price comparison websites and browser extensions
+    - Create automated shopping assistants and deal finders
+    - Power market research and competitive intelligence tools
+    - Optimize inventory management and purchasing decisions
+    - Develop deal aggregation platforms
+    
+    ### Getting Started
+    
+    1. Subscribe to a plan on RapidAPI (free BASIC tier available)
+    2. Get your API key from the RapidAPI dashboard
+    3. Add `X-RapidAPI-Key` and `X-RapidAPI-Host` headers to your requests
+    4. Start tracking prices!
+    
+    ### Support
+    
+    - **Documentation**: https://pricedrop-api.vercel.app/docs
+    - **GitHub**: https://github.com/Lemagicrach/pricedrop-api
+    - **Email**: support@pricedrop-api.com
+    
+  contact:
+    name: PriceDrop API Support
+    email: support@pricedrop-api.com
+    url: https://github.com/Lemagicrach/pricedrop-api
+  license:
+    name: MIT
+    url: https://github.com/Lemagicrach/pricedrop-api/blob/main/LICENSE
+  termsOfService: https://github.com/Lemagicrach/pricedrop-api/blob/main/docs/TERMS_OF_SERVICE.md
+
+servers:
+  - url: https://pricedrop-api.vercel.app
+    description: Production server
+  - url: https://pricedrop-api-staging.vercel.app
+    description: Staging server (for testing)
+
+tags:
+  - name: Discovery
+    description: Public endpoints for API overview and supported platforms
+  - name: Core
+    description: Health checks and system status
+  - name: Products
+    description: Product search, details, tracking, and comparison
+  - name: Prices
+    description: Price history, alerts, and monitoring
+  - name: Affiliate
+    description: Generate affiliate links for supported platforms
+
+security:
+  - RapidAPIAuth: []
+
+paths:
+  /api:
+    get:
+      tags:
+        - Discovery
+      summary: Get API overview
+      description: Public discovery endpoint that outlines available endpoints, rate limits, and support resources. No authentication required.
+      operationId: getApiOverview
+      security: []
+      responses:
+        '200':
+          description: API overview with endpoints and metadata
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  name:
+                    type: string
+                    example: PriceDrop API
+                  version:
+                    type: string
+                    example: 1.0.1
+                  description:
+                    type: string
+                  endpoints:
+                    type: object
+                  rateLimit:
+                    type: object
+                  support:
+                    type: object
+
+  /api/stores:
+    get:
+      tags:
+        - Discovery
+      summary: List supported stores
+      description: Returns metadata for all supported e-commerce platforms including eBay, Amazon, and upcoming integrations. No authentication required.
+      operationId: listStores
+      security: []
+      responses:
+        '200':
+          description: List of supported stores with capabilities
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  stores:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id:
+                          type: string
+                          example: ebay
+                        name:
+                          type: string
+                          example: eBay
+                        status:
+                          type: string
+                          enum: [active, pending, planned]
+                        features:
+                          type: array
+                          items:
+                            type: string
+
+  /api/v1/core/health:
+    get:
+      tags:
+        - Core
+      summary: Health check
+      description: Returns service health status, dependency checks, uptime, and RapidAPI header detection. No authentication required for monitoring.
+      operationId: healthCheck
+      security: []
+      responses:
+        '200':
+          description: Health status
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: healthy
+                  timestamp:
+                    type: string
+                    format: date-time
+                  uptime:
+                    type: object
+                  checks:
+                    type: object
+                  rapidapi:
+                    type: object
+
+  /api/v1/core/status:
+    get:
+      tags:
+        - Core
+      summary: Detailed system status
+      description: Returns comprehensive system information including version, environment, resource usage, and service dependencies.
+      operationId: getStatus
+      responses:
+        '200':
+          description: Detailed status information
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  environment:
+                    type: string
+                  version:
+                    type: string
+                  resources:
+                    type: object
+
+  /api/v1/products/search:
+    get:
+      tags:
+        - Products
+      summary: Search products
+      description: |
+        Search for products across supported platforms with filters for price range, condition, and sorting.
+        Currently supports eBay with real-time data. Returns product details including title, price, 
+        image, seller information, and direct links.
+      operationId: searchProducts
+      parameters:
+        - name: query
+          in: query
+          required: true
+          description: Search keywords (e.g., "iPhone 15 Pro", "Sony headphones")
+          schema:
+            type: string
+            example: iPhone 15 Pro
+        - name: platform
+          in: query
+          required: false
+          description: E-commerce platform to search (default is eBay)
+          schema:
+            type: string
+            enum: [ebay, amazon]
+            default: ebay
+        - name: minPrice
+          in: query
+          required: false
+          description: Minimum price filter in USD
+          schema:
+            type: number
+            minimum: 0
+            example: 100
+        - name: maxPrice
+          in: query
+          required: false
+          description: Maximum price filter in USD
+          schema:
+            type: number
+            minimum: 0
+            example: 1000
+        - name: condition
+          in: query
+          required: false
+          description: Product condition filter
+          schema:
+            type: string
+            enum: [new, used, refurbished, any]
+            default: any
+        - name: sortBy
+          in: query
+          required: false
+          description: Sort order for results
+          schema:
+            type: string
+            enum: [price_asc, price_desc, relevance, ending_soonest]
+            default: relevance
+        - name: limit
+          in: query
+          required: false
+          description: Maximum number of results to return
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 20
+      responses:
+        '200':
+          description: Search results
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  count:
+                    type: integer
+                  products:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Product'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '429':
+          $ref: '#/components/responses/RateLimitExceeded'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /api/v1/products/{id}:
+    get:
+      tags:
+        - Products
+      summary: Get product details
+      description: Retrieve detailed information for a specific product by ID, including current price, seller info, shipping details, and product specifications.
+      operationId: getProductById
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: Product ID (platform-specific identifier)
+          schema:
+            type: string
+            example: ebay_123456789
+      responses:
+        '200':
+          description: Product details
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  product:
+                    $ref: '#/components/schemas/ProductDetail'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /api/v1/products/track:
+    post:
+      tags:
+        - Products
+      summary: Track product price
+      description: |
+        Start tracking a product's price with customizable check frequency and target price alerts.
+        The API will monitor the product and send notifications when the price drops below your target.
+        Requires a paid subscription (PRO tier or higher).
+      operationId: trackProduct
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - url
+                - targetPrice
+              properties:
+                url:
+                  type: string
+                  format: uri
+                  description: Product URL from supported platform
+                  example: https://www.ebay.com/itm/123456789
+                targetPrice:
+                  type: number
+                  minimum: 0
+                  description: Target price in USD - alert when price drops below this
+                  example: 799.99
+                checkFrequency:
+                  type: string
+                  enum: [1min, 5min, 15min, 1hour, 6hour, 24hour]
+                  default: 15min
+                  description: How often to check the price (tier-dependent)
+                email:
+                  type: string
+                  format: email
+                  description: Email address for price drop notifications
+                  example: user@example.com
+                webhook:
+                  type: string
+                  format: uri
+                  description: Webhook URL for real-time notifications (ULTRA+ only)
+                  example: https://your-app.com/webhook/price-alert
+      responses:
+        '201':
+          description: Product tracking started
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  trackingId:
+                    type: string
+                  product:
+                    $ref: '#/components/schemas/Product'
+                  currentPrice:
+                    type: number
+                  targetPrice:
+                    type: number
+                  checkFrequency:
+                    type: string
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '402':
+          description: Payment required - feature not available in current tier
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '429':
+          $ref: '#/components/responses/RateLimitExceeded'
+
+  /api/v1/products/compare:
+    post:
+      tags:
+        - Products
+      summary: Compare product prices
+      description: Compare prices for the same product across multiple platforms or sellers. Returns price differences, best deals, and seller ratings.
+      operationId: compareProducts
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - urls
+              properties:
+                urls:
+                  type: array
+                  minItems: 2
+                  maxItems: 10
+                  items:
+                    type: string
+                    format: uri
+                  description: Array of product URLs to compare
+                  example:
+                    - https://www.ebay.com/itm/123456789
+                    - https://www.amazon.com/dp/B08L5VHQNQ
+      responses:
+        '200':
+          description: Price comparison results
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  comparison:
+                    type: object
+                    properties:
+                      products:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/Product'
+                      bestDeal:
+                        type: object
+                      priceDifference:
+                        type: number
+                      savings:
+                        type: number
+
+  /api/v1/prices/history:
+    get:
+      tags:
+        - Prices
+      summary: Get price history
+      description: |
+        Retrieve historical price data for a tracked product. Returns price points over time,
+        trend analysis, and statistics. History duration depends on subscription tier:
+        - PRO: 30 days
+        - ULTRA: 90 days
+        - MEGA: Unlimited
+      operationId: getPriceHistory
+      parameters:
+        - name: trackingId
+          in: query
+          required: true
+          description: Tracking ID from track product endpoint
+          schema:
+            type: string
+        - name: days
+          in: query
+          required: false
+          description: Number of days of history to retrieve (tier-dependent)
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 365
+            default: 30
+        - name: interval
+          in: query
+          required: false
+          description: Data point interval
+          schema:
+            type: string
+            enum: [hourly, daily, weekly]
+            default: daily
+      responses:
+        '200':
+          description: Price history data
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  trackingId:
+                    type: string
+                  product:
+                    $ref: '#/components/schemas/Product'
+                  history:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        timestamp:
+                          type: string
+                          format: date-time
+                        price:
+                          type: number
+                        available:
+                          type: boolean
+                  statistics:
+                    type: object
+                    properties:
+                      currentPrice:
+                        type: number
+                      lowestPrice:
+                        type: number
+                      highestPrice:
+                        type: number
+                      averagePrice:
+                        type: number
+                      trend:
+                        type: string
+                        enum: [increasing, decreasing, stable]
+
+  /api/v1/prices/alerts:
+    get:
+      tags:
+        - Prices
+      summary: List price alerts
+      description: Get all active price alerts for your account
+      operationId: listAlerts
+      responses:
+        '200':
+          description: List of active alerts
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  alerts:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Alert'
+    
+    post:
+      tags:
+        - Prices
+      summary: Create price alert
+      description: Create a new price alert for a tracked product
+      operationId: createAlert
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - trackingId
+                - targetPrice
+              properties:
+                trackingId:
+                  type: string
+                targetPrice:
+                  type: number
+                condition:
+                  type: string
+                  enum: [below, above, equals]
+                  default: below
+                email:
+                  type: string
+                  format: email
+                webhook:
+                  type: string
+                  format: uri
+      responses:
+        '201':
+          description: Alert created
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  alert:
+                    $ref: '#/components/schemas/Alert'
+
+  /api/v1/prices/alerts/{alertId}:
+    put:
+      tags:
+        - Prices
+      summary: Update price alert
+      description: Update an existing price alert
+      operationId: updateAlert
+      parameters:
+        - name: alertId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                targetPrice:
+                  type: number
+                enabled:
+                  type: boolean
+      responses:
+        '200':
+          description: Alert updated
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  alert:
+                    $ref: '#/components/schemas/Alert'
+    
+    delete:
+      tags:
+        - Prices
+      summary: Delete price alert
+      description: Delete a price alert
+      operationId: deleteAlert
+      parameters:
+        - name: alertId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Alert deleted
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  message:
+                    type: string
+
+  /api/v1/affiliate/generate:
+    post:
+      tags:
+        - Affiliate
+      summary: Generate affiliate links
+      description: Convert regular product URLs to affiliate links (currently supports Amazon)
+      operationId: generateAffiliateLinks
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - urls
+              properties:
+                urls:
+                  type: array
+                  items:
+                    type: string
+                    format: uri
+                  example:
+                    - https://www.amazon.com/dp/B08L5VHQNQ
+      responses:
+        '200':
+          description: Affiliate links generated
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  links:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        original:
+                          type: string
+                        affiliate:
+                          type: string
+                        platform:
+                          type: string
+
+components:
+  securitySchemes:
+    RapidAPIAuth:
+      type: apiKey
+      in: header
+      name: X-RapidAPI-Key
+      description: |
+        RapidAPI authentication key. Get your key from the RapidAPI dashboard after subscribing.
+        Also include the X-RapidAPI-Host header with value: pricedrop-api.vercel.app
+
+  schemas:
+    Product:
+      type: object
+      properties:
+        id:
+          type: string
+          description: Unique product identifier
+          example: ebay_123456789
+        title:
+          type: string
+          description: Product title
+          example: Apple iPhone 15 Pro Max 256GB - Natural Titanium
+        price:
+          type: number
+          description: Current price in USD
+          example: 1199.99
+        currency:
+          type: string
+          example: USD
+        image:
+          type: string
+          format: uri
+          description: Product image URL
+        url:
+          type: string
+          format: uri
+          description: Direct link to product page
+        platform:
+          type: string
+          enum: [ebay, amazon]
+        condition:
+          type: string
+          enum: [new, used, refurbished]
+        seller:
+          type: object
+          properties:
+            name:
+              type: string
+            rating:
+              type: number
+            feedbackScore:
+              type: integer
+        shipping:
+          type: object
+          properties:
+            cost:
+              type: number
+            free:
+              type: boolean
+        availability:
+          type: boolean
+        lastUpdated:
+          type: string
+          format: date-time
+
+    ProductDetail:
+      allOf:
+        - $ref: '#/components/schemas/Product'
+        - type: object
+          properties:
+            description:
+              type: string
+            specifications:
+              type: object
+            reviews:
+              type: object
+              properties:
+                count:
+                  type: integer
+                averageRating:
+                  type: number
+            priceHistory:
+              type: array
+              items:
+                type: object
+
+    Alert:
+      type: object
+      properties:
+        id:
+          type: string
+        trackingId:
+          type: string
+        targetPrice:
+          type: number
+        currentPrice:
+          type: number
+        condition:
+          type: string
+          enum: [below, above, equals]
+        enabled:
+          type: boolean
+        email:
+          type: string
+          format: email
+        webhook:
+          type: string
+          format: uri
+        createdAt:
+          type: string
+          format: date-time
+        lastTriggered:
+          type: string
+          format: date-time
+
+    Error:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: false
+        error:
+          type: object
+          properties:
+            code:
+              type: string
+            message:
+              type: string
+            details:
+              type: object
+
+  responses:
+    BadRequest:
+      description: Invalid request parameters
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            success: false
+            error:
+              code: BAD_REQUEST
+              message: Invalid parameters provided
+    
+    NotFound:
+      description: Resource not found
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            success: false
+            error:
+              code: NOT_FOUND
+              message: Product not found
+    
+    RateLimitExceeded:
+      description: Rate limit exceeded
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            success: false
+            error:
+              code: RATE_LIMIT_EXCEEDED
+              message: You have exceeded your rate limit. Upgrade your plan for higher limits.
+    
+    InternalError:
+      description: Internal server error
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            success: false
+            error:
+              code: INTERNAL_ERROR
+              message: An unexpected error occurred
+
+x-rapidapi-config:
+  pricing:
+    tiers:
+      - name: BASIC
+        price: 0
+        requests: 100
+        rateLimit: 10
+      - name: PRO
+        price: 25
+        requests: 1000
+        rateLimit: 30
+      - name: ULTRA
+        price: 75
+        requests: 10000
+        rateLimit: 100
+      - name: MEGA
+        price: 150
+        requests: 50000
+        rateLimit: 500
+
