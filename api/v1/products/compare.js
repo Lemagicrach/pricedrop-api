@@ -1,114 +1,89 @@
-// api/v1/products/compare.js - Cross-platform product price comparison
-const { withRapidAPI } = require('../../../lib/middleware');
+// api/v1/products/compare.js - Compare Product Prices
+// Route: POST /api/v1/products/compare
+// Auth: Required
+
+const { protectedRoute } = require('../../../lib/middleware');
+const { success, error } = require('../../../lib/utils/response');
+const { validateRequired, validateNumber } = require('../../../lib/utils/validation');
 const eBayAPI = require('../../../lib/ebay');
 
-// Instantiate the eBay API client using production credentials when available
-const ebay = new eBayAPI(process.env.EBAY_APP_ID, 'production');
+module.exports = protectedRoute(async (req, res) => {
+  // Validate inputs
+  const product = validateRequired(req.body.product, 'product');
+  const limit = validateNumber(req.body.limit || 10, 'limit', { 
+    min: 1, 
+    max: 50, 
+    integer: true 
+  });
 
-// Helper to calculate the average price from eBay listings
-const calculateAverage = (items = []) => {
-  if (!Array.isArray(items) || items.length === 0) {
-    return null;
-  }
+  // Initialize eBay API
+  const ebay = new eBayAPI(process.env.EBAY_APP_ID, 'production');
 
-  const prices = items
-    .map(item => {
-      if (item?.price == null) return null;
-      if (typeof item.price === 'number') return item.price;
-      if (typeof item.price?.value !== 'undefined') {
-        const value = parseFloat(item.price.value);
-        return Number.isNaN(value) ? null : value;
-      }
-      if (typeof item.price?.amount !== 'undefined') {
-        const value = parseFloat(item.price.amount);
-        return Number.isNaN(value) ? null : value;
-      }
-      return null;
-    })
-    .filter(price => typeof price === 'number' && !Number.isNaN(price));
+  // Search eBay
+  const ebayResults = await ebay.searchProducts(product, limit);
+  const ebayItems = Array.isArray(ebayResults?.items) ? ebayResults.items : [];
+  
+  // Calculate statistics
+  const ebayPrices = ebayItems
+    .map(item => item.price?.value)
+    .filter(price => typeof price === 'number' && price > 0);
+  
+  const averagePrice = ebayPrices.length > 0
+    ? (ebayPrices.reduce((sum, p) => sum + p, 0) / ebayPrices.length).toFixed(2)
+    : null;
+  
+  const lowestPrice = ebayPrices.length > 0 ? Math.min(...ebayPrices) : null;
+  const highestPrice = ebayPrices.length > 0 ? Math.max(...ebayPrices) : null;
 
-  if (prices.length === 0) {
-    return null;
-  }
-
-  const total = prices.reduce((sum, value) => sum + value, 0);
-  return Number((total / prices.length).toFixed(2));
-};
-
-module.exports = withRapidAPI(async (req, res) => {
-  const { product, limit: limitParam } = req.body || {};
-  const limit = Number.isInteger(limitParam) ? limitParam : parseInt(limitParam, 10) || 5;
-
-  if (!product) {
-    return res.status(400).json({
-      success: false,
-      error: 'Product name or keywords are required',
-      code: 'MISSING_PRODUCT'
-    });
-  }
-
-  try {
-    const ebayResults = await ebay.searchProducts(product, limit);
-    const ebayItems = Array.isArray(ebayResults?.items) ? ebayResults.items : [];
-    const firstItem = ebayItems[0];
-    const averagePrice = calculateAverage(ebayItems);
-
-    const ebayComparison = {
-      platform: 'ebay',
-      available: ebayItems.length > 0,
-      totalResults: ebayResults?.count || ebayItems.length,
-      environment: ebayResults?.environment || 'production',
-      lowest: ebayItems.length > 0
-        ? {
-          price: typeof firstItem?.price?.value !== 'undefined'
-            ? parseFloat(firstItem.price.value)
-            : (typeof firstItem?.price === 'number' ? firstItem.price : null),
-          currency: firstItem?.price?.currency || 'USD',
-          url: firstItem?.url || null
-        }
-        : null,
+  // Format eBay comparison
+  const ebayComparison = {
+    platform: 'ebay',
+    available: ebayItems.length > 0,
+    totalResults: ebayResults?.count || ebayItems.length,
+    statistics: {
       averagePrice,
-      listings: ebayItems.slice(0, limit).map(item => ({
-        id: item.itemId,
-        title: item.title,
-        price: item.price,
-        url: item.url,
-        image: item.image,
-        seller: item.seller,
-        condition: item.condition,
-        shipping: item.shipping
-      })),
-      message: ebayItems.length > 0
-        ? null
-        : (ebayResults?.error || 'No eBay listings found for this query')
-    };
+      lowestPrice,
+      highestPrice,
+      currency: ebayItems[0]?.price?.currency || 'USD'
+    },
+    listings: ebayItems.slice(0, limit).map(item => ({
+      id: item.itemId,
+      title: item.title,
+      price: item.price,
+      url: item.url,
+      image: item.image,
+      seller: item.seller,
+      condition: item.condition,
+      shipping: item.shipping
+    })),
+    message: ebayItems.length > 0 ? null : 'No eBay listings found for this query'
+  };
 
-    const response = {
-      success: true,
-      product: {
-        query: product,
-        limit,
-        marketplace: 'comparison'
-      },
-      comparison: {
-        ebay: ebayComparison,
-        amazon: {
-          platform: 'amazon',
-          available: false,
-          note: 'Amazon price data requires PA-API access',
-          searchUrl: `https://amazon.com/s?k=${encodeURIComponent(product)}&tag=your-tag`
-        }
-      },
-      timestamp: new Date().toISOString()
-    };
+  // Amazon comparison (affiliate links only)
+  const amazonComparison = {
+    platform: 'amazon',
+    available: false,
+    note: 'Amazon price data requires PA-API access',
+    searchUrl: `https://amazon.com/s?k=${encodeURIComponent(product)}&tag=${process.env.AMAZON_PARTNER_TAG || 'your-tag-20'}`,
+    message: 'Use search URL to browse Amazon listings manually'
+  };
 
-    return res.status(200).json(response);
-  } catch (error) {
-    console.error('Comparison error:', error);
-    return res.status(500).json({
-      success: false,
-      error: 'Failed to compare product prices',
-      message: error.message
-    });
-  }
+  return success(res, {
+    query: {
+      product,
+      limit
+    },
+    comparison: {
+      ebay: ebayComparison,
+      amazon: amazonComparison
+    },
+    summary: {
+      platforms_checked: 2,
+      platforms_available: ebayItems.length > 0 ? 1 : 0,
+      total_listings: ebayItems.length,
+      price_range: lowestPrice && highestPrice 
+        ? `$${lowestPrice} - $${highestPrice}`
+        : 'N/A'
+    }
+  });
 });

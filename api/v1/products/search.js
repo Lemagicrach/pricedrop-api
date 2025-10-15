@@ -1,77 +1,88 @@
-// api/v1/products/search.js
-const { withRapidAPI } = require('../../../lib/middleware');
+// api/v1/products/search.js - Search Products
+// Route: GET /api/v1/products/search?keywords={query}&limit={number}
+// Auth: Required
+
+const { protectedRoute } = require('../../../lib/middleware');
+const { success, error } = require('../../../lib/utils/response');
+const { validateString, validateNumber, validateEnum } = require('../../../lib/utils/validation');
 const eBayAPI = require('../../../lib/ebay');
 
-module.exports = withRapidAPI(async (req, res) => {
-  const { 
-    keywords, 
-    limit = 20, 
-    minPrice, 
-    maxPrice, 
-    sortBy = 'relevance' 
-  } = req.query;
+module.exports = protectedRoute(async (req, res) => {
+  // Validate inputs
+  const keywords = validateString(req.query.keywords, 'keywords', { minLength: 1 });
+  const limit = validateNumber(req.query.limit || 20, 'limit', { 
+    min: 1, 
+    max: 100, 
+    integer: true 
+  });
   
-  if (!keywords) {
-    return res.status(400).json({
-      success: false,
-      error: 'Keywords parameter is required',
-      code: 'MISSING_KEYWORDS'
-    });
-  }
-  
-  try {
-    // Initialize eBay API
-    const ebay = new eBayAPI(process.env.EBAY_APP_ID, 'production');
-    
-     // Build filters
-    const filters = {};
-    if (minPrice) filters.minPrice = minPrice;
-    if (maxPrice) filters.maxPrice = maxPrice;
-    
-    // Search products
-    const results = await ebay.searchProducts(keywords, limit, {
-      sortOrder: sortBy,
-      filters: filters
-    });
-    
-    if (!results.success) {
-      throw new Error(results.error || 'Search failed');
-    }
-    
-    // Format response
-    const formattedResults = results.items.map(item => ({
-      id: item.itemId,
-      title: item.title,
-      price: {
-        current: item.price.value,
-        currency: item.price.currency,
-        shipping: item.shipping?.cost || 0
-      },
- 
-      url: item.url,
-      image: item.image,
-      condition: item.condition,
-      seller: item.seller,
-      listing: item.listing
- }));
+  const sortBy = req.query.sortBy 
+    ? validateEnum(req.query.sortBy, 'sortBy', ['relevance', 'price', 'newest'])
+    : 'relevance';
 
-    return res.status(200).json({
-      success: true,
-      query: {
-        keywords,
-        limit: Number(limit),
-        sortBy
-      },
-      count: formattedResults.length,
-      items: formattedResults
-    });
-  } catch (error) {
-    console.error('Product search error:', error);
-    return res.status(502).json({
-      success: false,
-      error: 'Failed to search products',
-      message: error.message
-    });
+  // Optional price filters
+  const filters = {};
+  if (req.query.minPrice) {
+    filters.minPrice = validateNumber(req.query.minPrice, 'minPrice', { min: 0 });
   }
+  if (req.query.maxPrice) {
+    filters.maxPrice = validateNumber(req.query.maxPrice, 'maxPrice', { min: 0 });
+  }
+
+  // Validate price range
+  if (filters.minPrice && filters.maxPrice && filters.minPrice > filters.maxPrice) {
+    return error(res, 'minPrice cannot be greater than maxPrice', 400, 'INVALID_PRICE_RANGE');
+  }
+
+  // Initialize eBay API
+  const ebay = new eBayAPI(process.env.EBAY_APP_ID, 'production');
+  
+  // Check if eBay is configured
+  if (!ebay.isConfigured()) {
+    return error(
+      res,
+      'eBay API not configured. Please contact support.',
+      503,
+      'SERVICE_UNAVAILABLE'
+    );
+  }
+
+  // Search products
+  const results = await ebay.searchProducts(keywords, limit, {
+    sortOrder: sortBy,
+    filters
+  });
+
+  if (!results.success) {
+    return error(res, results.error || 'Search failed', 502, 'SEARCH_FAILED');
+  }
+
+  // Format items
+  const items = results.items.map(item => ({
+    id: item.itemId,
+    title: item.title,
+    price: {
+      current: item.price.value,
+      currency: item.price.currency,
+      shipping: item.shipping?.cost || 0
+    },
+    url: item.url,
+    image: item.image,
+    condition: item.condition,
+    seller: item.seller,
+    listing: item.listing,
+    location: item.location
+  }));
+
+  return success(res, {
+    query: {
+      keywords,
+      limit,
+      sortBy,
+      filters
+    },
+    count: items.length,
+    totalResults: results.totalEntries || items.length,
+    items
+  });
 });
-
