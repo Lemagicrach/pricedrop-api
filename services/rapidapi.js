@@ -47,6 +47,15 @@ const verifyRapidAPI = async (req) => {
     }
   };
 };
+// Add to services/rapidapi.js after verification
+const logAPIRequest = async (userId, endpoint, status) => {
+  await supabase.from('api_logs').insert([{
+    user_id: userId,
+    endpoint,
+    status,
+    created_at: new Date().toISOString()
+  }]);
+};
 
 const countRequestsSince = async (userId, since) => {
   if (!supabase || !userId || !since) {

@@ -41,6 +41,25 @@ const sendPriceDropEmail = async (email, product = {}, oldPrice, newPrice) => {
     return false;
   }
 };
+// Add to services/notifications.js
+const sendWebhook = async (webhookUrl, payload) => {
+  const axios = require('axios');
+  
+  try {
+    await axios.post(webhookUrl, {
+      event: 'price_drop',
+      timestamp: new Date().toISOString(),
+      ...payload
+    }, {
+      headers: { 'Content-Type': 'application/json' },
+      timeout: 5000
+    });
+    return true;
+  } catch (error) {
+    console.error('Webhook error:', error);
+    return false;
+  }
+};
 
 const sendNotification = async (notification = {}) => {
   const { type } = notification;
@@ -90,11 +109,23 @@ const sendNotification = async (notification = {}) => {
           newPriceValue
         );
       }
-
+ 
+  // Add webhook support
+  if (notification.webhook_url) {
+    results.webhook = await sendWebhook(notification.webhook_url, {
+      product: product,
+      old_price: oldPriceValue,
+      new_price: newPriceValue,
+      drop_percentage: discountPercent
+    });
+  }
+  
+  return results;
+}
       // Additional notification channels (webhook, SMS, etc.) can be handled here
       return results;
     }
-    default:
+      default:
       console.warn(`Unsupported notification type: ${type}`);
       return {};
   }

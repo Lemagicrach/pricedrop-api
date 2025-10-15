@@ -95,39 +95,55 @@ async function getProducts(filters = {}) {
 }
 
 // Price history operations
+// In services/database.js - updatePrice function
 async function updatePrice(productId, priceData) {
   try {
-    // Add to price history
-    const historyRecord = {
-      product_id: productId,
-      price: priceData.price,
-      in_stock: priceData.in_stock,
-      recorded_at: priceData.timestamp || new Date().toISOString()
-    };
-
-    if (priceData.currency) {
-      historyRecord.currency = priceData.currency;
-    }
-    const { data: history, error: historyError } = await supabase
-      .from('price_history')
-      .insert([historyRecord])
-      .select();
-
-    if (historyError) throw historyError;
-
-    // Update product's current price
-    const { error: updateError } = await supabase
+    // Get current price first to detect actual changes
+    const { data: currentProduct } = await supabase
       .from('products')
-      .update({
-        current_price: priceData.price,
+      .select('current_price')
+      .eq('id', productId)
+      .single();
+    
+    const priceChanged = currentProduct && 
+                        currentProduct.current_price !== priceData.price;
+    
+    // Only log if price actually changed
+    if (!currentProduct || priceChanged) {
+      const historyRecord = {
+        product_id: productId,
+        price: priceData.price,
         in_stock: priceData.in_stock,
-        last_checked: new Date().toISOString()
-      })
-      .eq('id', productId);
+        recorded_at: priceData.timestamp || new Date().toISOString()
+      };
+      
+      if (priceData.currency) {
+        historyRecord.currency = priceData.currency;
+      }
+      
+      const { data: history, error: historyError } = await supabase
+        .from('price_history')
+        .insert([historyRecord])
+        .select();
 
-    if (updateError) throw updateError;
+      if (historyError) throw historyError;
 
-    return history[0];
+      // Update product's current price
+      const { error: updateError } = await supabase
+        .from('products')
+        .update({
+          current_price: priceData.price,
+          in_stock: priceData.in_stock,
+          last_checked: new Date().toISOString()
+        })
+        .eq('id', productId);
+
+      if (updateError) throw updateError;
+
+      return { data: history[0], priceChanged };
+    }
+    
+    return { data: null, priceChanged: false };
   } catch (error) {
     console.error('Database error:', error);
     throw error;
@@ -170,6 +186,52 @@ async function getPriceHistory(productId, days = 30) {
   } catch (error) {
     console.error('Database error:', error);
     return { history: [], stats: null };
+  }
+}
+// Add to services/database.js
+async function predictPricePattern(productId) {
+  try {
+    const { history } = await getPriceHistory(productId, 90);
+    
+    if (history.length < 7) {
+      return { pattern: 'insufficient_data' };
+    }
+    
+    // Simple pattern detection
+    const prices = history.map(h => h.price);
+    const avg = prices.reduce((a, b) => a + b) / prices.length;
+    const recent = prices.slice(-7);
+    const recentAvg = recent.reduce((a, b) => a + b) / recent.length;
+    
+    // Detect if prices typically drop on certain days
+    const dayPrices = {};
+    history.forEach(h => {
+      const day = new Date(h.recorded_at).getDay();
+      if (!dayPrices[day]) dayPrices[day] = [];
+      dayPrices[day].push(h.price);
+    });
+    
+    const dayAverages = {};
+    Object.keys(dayPrices).forEach(day => {
+      const prices = dayPrices[day];
+      dayAverages[day] = prices.reduce((a, b) => a + b) / prices.length;
+    });
+    
+    const lowestDay = Object.keys(dayAverages).reduce((a, b) => 
+      dayAverages[a] < dayAverages[b] ? a : b
+    );
+    
+    return {
+      pattern: recentAvg < avg ? 'decreasing' : 'increasing',
+      average_price: avg.toFixed(2),
+      recent_average: recentAvg.toFixed(2),
+      best_day_to_buy: ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'][lowestDay],
+      lowest_recorded: Math.min(...prices),
+      highest_recorded: Math.max(...prices)
+    };
+  } catch (error) {
+    console.error('Prediction error:', error);
+    return { pattern: 'error' };
   }
 }
 
@@ -279,16 +341,22 @@ async function deleteAlert(alertId) {
 async function triggerAlert(alertId, priceData) {
   try {
     // Update alert with trigger info
-    const { data, error } = await supabase
-      .from('alerts')
-      .update({
-        last_triggered: new Date().toISOString(),
-        trigger_count: supabase.raw('trigger_count + 1'),
-        last_price: priceData.price
-      })
-      .eq('id', alertId)
-      .select()
-      .single();
+const { data: currentAlert } = await supabase
+  .from('alerts')
+  .select('trigger_count')
+  .eq('id', alertId)
+  .single();
+
+const { data, error } = await supabase
+  .from('alerts')
+  .update({
+    last_triggered: new Date().toISOString(),
+    trigger_count: (currentAlert?.trigger_count || 0) + 1,
+    last_price: priceData.price
+  })
+  .eq('id', alertId)
+  .select()
+  .single();
 
     if (error) throw error;
 
