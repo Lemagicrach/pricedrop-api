@@ -89,8 +89,15 @@ try {
 ```
 ## 🛒 Listing on RapidAPI
 
-Ready to share your deployment with the marketplace? Follow the step-by-step checklist in [`docs/RAPIDAPI_LISTING.md`](docs/RAPIDAPI_LISTING.md) to gather assets, configure pricing, import the OpenAPI schema, and run end-to-end tests through RapidAPI before making the listing public.
+When you're ready to publish the API on RapidAPI, walk through this launch checklist:
 
+1. **Deploy & Smoke-Test** – Ensure the Vercel deployment is live (e.g., `https://pricedrop-api.vercel.app`) and that the health check passes.
+2. **Import the Spec** – Upload `openapi-rapidapi.yaml` during the "Add New API" flow inside the [RapidAPI Provider Hub](https://rapidapi.com/provider) to preload all endpoints.
+3. **Fill in Listing Details** – Use the descriptions, pricing tiers, and screenshots outlined in `docs/RAPIDAPI_LISTING.md`.
+4. **Configure Monetization** – Create the BASIC, PRO, ULTRA, and MEGA pricing plans with the quotas and overage fees documented in `RAPIDAPI_IMPORT_GUIDE.md`.
+5. **Run Console Tests** – Validate each endpoint directly from RapidAPI's testing console before publishing the listing publicly.
+
+Need more depth? The [RapidAPI Listing guide](docs/RAPIDAPI_LISTING.md) covers the marketplace configuration from assets to marketing, while [`RAPIDAPI_IMPORT_GUIDE.md`](RAPIDAPI_IMPORT_GUIDE.md) provides the annotated OpenAPI import walkthrough.
 ## 📚 API Endpoints
 
 ### **Products**
