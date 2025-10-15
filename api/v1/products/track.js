@@ -1,17 +1,8 @@
-// api/v1/products/track.js - Track Product Prices
-// Route: POST /api/v1/products/track
-// Auth: Required
-
-const { protectedRoute } = require('../../../lib/middleware');
-const { success, error } = require('../../../lib/utils/response');
-const { 
-  validateRequired,
-  validateUrl,
-  validateNumber,
-  validateEmail
-} = require('../../../lib/utils/validation');
-const { extractProductInfo } = require('../../../services/productScraper');
-const { createProduct, updatePrice } = require('../../../services/database');
+// api/v1/products/track.js - Real product tracking with database integration
+const { withCORS, validateRapidAPI } = require('../../lib/middleware');
+const { extractProductInfo } = require('../../services/productScraper');
+const { createProduct, updatePrice } = require('../../services/database');
+const { sendNotification } = require('../../services/notifications');
 
 module.exports = protectedRoute(async (req, res) => {
   // Only accept POST requests

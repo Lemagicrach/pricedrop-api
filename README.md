@@ -3,7 +3,7 @@
 [![RapidAPI](https://img.shields.io/badge/RapidAPI-Ready-blue)](https://rapidapi.com)
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 [![Node](https://img.shields.io/badge/node-%3E%3D18.0.0-brightgreen.svg)](package.json)
-[![Status](https://img.shields.io/badge/status-production-success.svg)](https://github.com/yourusername/pricedrop-api)
+[![Status](https://img.shields.io/badge/status-production-success.svg)](https://github.com/Lemagicrach/pricedrop-api)
 
 **Professional price tracking API for e-commerce platforms.** Monitor product prices, receive alerts on price drops, and analyze pricing trends across major online retailers.
 
@@ -425,7 +425,7 @@ Want to run your own instance? Here's how:
 
 ```bash
 # Clone repository
-git clone https://github.com/yourusername/pricedrop-api.git
+git clone https://github.com/Lemagicrach/pricedrop-api.git
 cd pricedrop-api
 
 # Install dependencies
