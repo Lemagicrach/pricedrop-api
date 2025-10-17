@@ -33,7 +33,7 @@ info:
     
     ### Support
     
-    - **Documentation**: https://pricedrop-api.vercel.app/docs
+    - **Documentation**: https://pricedrop-api-five.vercel.app/docs
     - **GitHub**: https://github.com/Lemagicrach/pricedrop-api
     - **Email**: support@pricedrop-api.com
     
@@ -47,7 +47,7 @@ info:
   termsOfService: https://github.com/Lemagicrach/pricedrop-api/blob/main/docs/TERMS_OF_SERVICE.md
 
 servers:
-  - url: https://pricedrop-api.vercel.app
+  - url: https://pricedrop-api-five.vercel.app
     description: Production server
   - url: https://pricedrop-api-staging.vercel.app
     description: Staging server (for testing)
