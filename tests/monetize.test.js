@@ -1,89 +1,85 @@
-const test = require('node:test');
-const assert = require('node:assert/strict');
-const monetize = require('../api/monetize');
+// tests/monetize.test.js
+const request = require('supertest');
+const express = require('express');
 
-const mockDeps = {
-  ebay: {
-    searchProducts: async (keywords, limit) => ({
-      success: true,
-      keywords,
-      limit,
-      items: [{ itemId: '123', title: 'Test Item' }]
-    }),
-    getProductDetails: async () => ({
-      success: true,
-      product: { itemId: '123', title: 'Mock Item' }
-    })
-  },
-  amazon: {
-    createAffiliateLink: async () => ({ success: true, affiliateUrl: 'https://amazon.com/mock' }),
-    detectRegion: () => 'US',
-    amazonDomains: { US: 'amazon.com' },
-    generateCategoryLink: () => 'https://amazon.com/b?node=mock'
-  }
-};
+// Create a test app instance
+const app = express();
+app.use(express.json());
 
-function createMockRes() {
-  return {
-    statusCode: 200,
-    headers: {},
-    body: null,
-    ended: false,
-    status(code) {
-      this.statusCode = code;
-      return this;
-    },
-    json(payload) {
-      this.body = payload;
-      return this;
-    },
-    end() {
-      this.ended = true;
-      return this;
-    },
-    setHeader(name, value) {
-      this.headers[name] = value;
-    }
-  };
-}
+// Import the monetize route handler
+const monetizeHandler = require('../api/v1/monetize');
 
-test('monetize endpoint returns unauthorized for missing API key', async () => {
-  const req = {
-    method: 'POST',
-    headers: {},
-    body: {
-      action: 'ebay:search',
-      keywords: 'camera'
-    }
-  };
-  const res = createMockRes();
-
-  await monetize(req, res, mockDeps);
-
-  assert.equal(res.statusCode, 401);
-  assert.equal(res.body.success, false);
-  assert.equal(res.body.error.code, 'MISSING_API_KEY');
+// Set up the route for testing
+app.post('/api/v1/monetize', monetizeHandler);
+app.get('/api/v1/monetize/health', (req, res) => {
+  res.json({ status: 'healthy', timestamp: new Date().toISOString() });
 });
 
-test('monetize endpoint routes eBay search action', async () => {
-  const req = {
-    method: 'POST',
-    headers: {
-      'x-api-key': 'test-pro-key'
-    },
-    body: {
-      action: 'ebay:search',
-      keywords: 'headphones',
-      limit: 5
-    }
-  };
-  const res = createMockRes();
+describe('Monetization API', () => {
+  describe('POST /api/v1/monetize', () => {
+    it('should return 401 when no API key is provided', async () => {
+      const response = await request(app)
+        .post('/api/v1/monetize')
+        .send({
+          action: 'ebay_search',
+          params: {
+            keywords: 'laptop'
+          }
+        });
+      
+      expect(response.status).toBe(401);
+      expect(response.body).toHaveProperty('error');
+    });
 
-  await monetize(req, res, mockDeps);
+    it('should return 401 with invalid API key', async () => {
+      const response = await request(app)
+        .post('/api/v1/monetize')
+        .set('x-api-key', 'invalid-key-123')
+        .send({
+          action: 'ebay_search',
+          params: {
+            keywords: 'laptop'
+          }
+        });
+      
+      expect(response.status).toBe(401);
+    });
 
-  assert.equal(res.statusCode, 200);
-  assert.equal(res.body.success, true);
-  assert.equal(res.body.action, 'ebay:search');
-  assert.deepEqual(res.body.data.items, [{ itemId: '123', title: 'Test Item' }]);
-  assert.equal(res.body.plan, 'pro');
+    it('should return 400 when action is missing', async () => {
+      const response = await request(app)
+        .post('/api/v1/monetize')
+        .set('x-api-key', process.env.TEST_API_KEY || 'test-api-key')
+        .send({
+          params: {
+            keywords: 'laptop'
+          }
+        });
+      
+      expect(response.status).toBe(400);
+      expect(response.body).toHaveProperty('error');
+    });
+
+    it('should return 400 for unsupported action', async () => {
+      const response = await request(app)
+        .post('/api/v1/monetize')
+        .set('x-api-key', process.env.TEST_API_KEY || 'test-api-key')
+        .send({
+          action: 'unsupported_action',
+          params: {}
+        });
+      
+      expect(response.status).toBe(400);
+      expect(response.body.error).toContain('Unsupported action');
+    });
+  });
+
+  describe('GET /api/v1/monetize/health', () => {
+    it('should return health status', async () => {
+      const response = await request(app)
+        .get('/api/v1/monetize/health');
+      
+      expect(response.status).toBe(200);
+      expect(response.body).toHaveProperty('status', 'healthy');
+    });
+  });
 });

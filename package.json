@@ -6,12 +6,32 @@
   "scripts": {
     "start": "node api/index.js",
     "deploy": "vercel --prod",
-    "test": "node scripts/test-production.js",
+    "test:production": "node scripts/test-production.js",
     "test:components": "node scripts/test-endpoints.js",
     "test:local": "NODE_ENV=development node scripts/test-production.js",
-    "db:migrate": "node scripts/migrate-database.js",
     "cron:test": "node api/cron/check-prices.js",
-    "setup": "npm install && npm run db:migrate"
+    "setup": "npm install && npm run db:migrate",
+    "db:migrate": "node scripts/migrate-database.js",
+    "db:verify": "node scripts/verify-database.js",
+    "db:migrate-keys": "node scripts/migrate-api-keys.js",
+    "test:ci": "jest --ci --coverage --maxWorkers=2",
+    "test": "cross-env NODE_ENV=test TEST_API_KEY=pda_test_abcdefghijklmnopqrstuvwxyz123456 jest",
+    "test:watch": "cross-env NODE_ENV=test TEST_API_KEY=pda_test_abcdefghijklmnopqrstuvwxyz123456 jest --watch",
+    "test:coverage": "cross-env NODE_ENV=test TEST_API_KEY=pda_test_abcdefghijklmnopqrstuvwxyz123456 jest --coverage",
+    "test:env": "jest --setupFiles ./jest.setup.js"
+  },
+  "jest": {
+    "testEnvironment": "node",
+    "coveragePathIgnorePatterns": [
+      "/node_modules/"
+    ],
+    "testMatch": [
+      "**/tests/**/*.test.js"
+    ],
+    "setupFiles": [
+      "./jest.setup.js"
+    ],
+    "testTimeout": 10000
   },
   "engines": {
     "node": ">=18.0.0"
@@ -21,12 +41,16 @@
     "@supabase/supabase-js": "^2.58.0",
     "axios": "^1.12.2",
     "cheerio": "^1.1.2",
-    "dotenv": "^16.3.1",
     "express-rate-limit": "^7.5.1",
     "nodemailer": "^7.0.9"
   },
   "devDependencies": {
+    "@types/jest": "^30.0.0",
     "@types/node": "^20.19.19",
+    "cross-env": "^10.1.0",
+    "dotenv": "^17.2.3",
+    "jest": "^30.2.0",
+    "supertest": "^7.1.4",
     "vercel": "^32.0.1"
   },
   "keywords": [
