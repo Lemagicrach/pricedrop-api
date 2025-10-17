@@ -1,19 +1,29 @@
 // services/database-secure.js - Database operations with security fixes
 const { createClient } = require('@supabase/supabase-js');
-const { generateApiKey, hashApiKey, verifyApiKey, createLookupHash } = require('./apiKeyService');
 
-// ✅ SECURITY FIX: Fail if environment variables are missing
-if (!process.env.SUPABASE_URL || !process.env.SUPABASE_ANON_KEY) {
-  throw new Error(
-    'Database configuration missing! Set SUPABASE_URL and SUPABASE_ANON_KEY environment variables.'
-  );
-}
+// Lazy initialization - only check when actually used
+let supabase = null;
+let initializationError = null;
 
-// Initialize Supabase with connection pool settings
-const supabase = createClient(
-  process.env.SUPABASE_URL,
-  process.env.SUPABASE_ANON_KEY,
-  {
+function getSupabase() {
+  if (supabase) return supabase;
+  
+  if (initializationError) throw initializationError;
+  
+  const supabaseUrl = process.env.SUPABASE_URL;
+  const supabaseKey = process.env.SUPABASE_ANON_KEY;
+  
+  if (!supabaseUrl || !supabaseKey) {
+    initializationError = new Error(
+      'Database configuration missing! Set SUPABASE_URL and SUPABASE_ANON_KEY environment variables.'
+    );
+    console.error('❌ Database not configured');
+    console.error('   Set SUPABASE_URL and SUPABASE_ANON_KEY in .env.local');
+    throw initializationError;
+  }
+  
+  // Initialize Supabase with connection pool settings
+  supabase = createClient(supabaseUrl, supabaseKey, {
     auth: {
       persistSession: false
     },
@@ -25,48 +35,41 @@ const supabase = createClient(
         'x-connection-pool': 'true'
       }
     }
+  });
+  
+  console.log('✅ Database connection initialized');
+  return supabase;
+}
+
+// Create a proxy that auto-initializes on first access
+const supabaseProxy = new Proxy({}, {
+  get(target, prop) {
+    return getSupabase()[prop];
   }
-);
+});
 
 // ============================================
-// USER OPERATIONS WITH SECURE API KEYS
+// USER OPERATIONS
 // ============================================
 
 /**
- * Create a new user with secure API key
+ * Create a new user
  */
 async function createUser(userData) {
   try {
-    // Generate new API key
-    const apiKey = generateApiKey(userData.plan || 'free');
+    const db = getSupabase();
     
-    // Hash the API key for storage
-    const { hash, prefix } = hashApiKey(apiKey);
-    
-    // Create lookup hash for fast searching
-    const lookupHash = createLookupHash(apiKey);
-    
-    // Store user with hashed API key
-    const { data, error } = await supabase
+    const { data, error } = await db
       .from('api_users')
       .insert([{
         ...userData,
-        api_key_hash: hash,
-        api_key_prefix: prefix,
-        api_key_lookup: lookupHash,
         created_at: new Date().toISOString()
       }])
       .select()
       .single();
 
     if (error) throw error;
-    
-    // Return user data with the actual API key (only shown once!)
-    return {
-      ...data,
-      api_key: apiKey, // Only returned on creation
-      message: 'Save this API key - it will not be shown again!'
-    };
+    return data;
   } catch (error) {
     console.error('Failed to create user:', error);
     throw error;
@@ -74,92 +77,41 @@ async function createUser(userData) {
 }
 
 /**
- * Get user by API key (with secure verification)
+ * Get user by API key
  */
-async function getUserByApiKey(providedKey) {
+async function getUserByApiKey(apiKey) {
   try {
-    // Create lookup hash for quick search
-    const lookupHash = createLookupHash(providedKey);
+    const db = getSupabase();
     
-    // Find potential matches using lookup hash
-    const { data: candidates, error } = await supabase
+    const { data, error } = await db
       .from('api_users')
       .select('*')
-      .eq('api_key_lookup', lookupHash);
+      .eq('api_key', apiKey)
+      .single();
 
-    if (error) throw error;
-    if (!candidates || candidates.length === 0) return null;
-    
-    // Verify the actual API key against stored hashes
-    for (const candidate of candidates) {
-      if (verifyApiKey(providedKey, candidate.api_key_hash)) {
-        // Don't return the hash to the client
-        const { api_key_hash, ...safeUser } = candidate;
-        return safeUser;
-      }
+    if (error) {
+      if (error.code === 'PGRST116') return null; // Not found
+      throw error;
     }
     
-    return null;
+    return data;
   } catch (error) {
     console.error('Failed to get user by API key:', error);
     return null;
   }
 }
 
-/**
- * Rotate API key for a user
- */
-async function rotateApiKey(userId) {
-  try {
-    // Get user
-    const { data: user, error: userError } = await supabase
-      .from('api_users')
-      .select('*')
-      .eq('id', userId)
-      .single();
-
-    if (userError || !user) throw new Error('User not found');
-    
-    // Generate new API key
-    const newApiKey = generateApiKey(user.plan);
-    const { hash, prefix } = hashApiKey(newApiKey);
-    const lookupHash = createLookupHash(newApiKey);
-    
-    // Update user with new hashed key
-    const { data, error } = await supabase
-      .from('api_users')
-      .update({
-        api_key_hash: hash,
-        api_key_prefix: prefix,
-        api_key_lookup: lookupHash,
-        api_key_rotated_at: new Date().toISOString()
-      })
-      .eq('id', userId)
-      .select()
-      .single();
-
-    if (error) throw error;
-    
-    return {
-      ...data,
-      new_api_key: newApiKey,
-      message: 'API key rotated successfully. Save the new key!'
-    };
-  } catch (error) {
-    console.error('Failed to rotate API key:', error);
-    throw error;
-  }
-}
-
 // ============================================
-// PRODUCT OPERATIONS WITH VALIDATION
+// PRODUCT OPERATIONS
 // ============================================
 
 /**
- * Create or update product with input validation
+ * Create or update product with validation
  */
 async function createProduct(productData) {
   try {
+    const db = getSupabase();
+    
     // Validate required fields
     if (!productData.url) {
       throw new Error('Product URL is required');
@@ -181,7 +133,7 @@ async function createProduct(productData) {
     };
 
     // Check if product already exists
-    const { data: existing } = await supabase
+    const { data: existing } = await db
       .from('products')
       .select('*')
       .eq('url', sanitized.url)
@@ -189,7 +141,7 @@ async function createProduct(productData) {
 
     if (existing) {
       // Update existing product
-      const { data, error } = await supabase
+      const { data, error } = await db
         .from('products')
         .update({
           ...sanitized,
@@ -204,7 +156,7 @@ async function createProduct(productData) {
     }
 
     // Create new product
-    const { data, error } = await supabase
+    const { data, error } = await db
       .from('products')
       .insert([sanitized])
       .select()
@@ -218,43 +170,284 @@ async function createProduct(productData) {
   }
 }
 
+/**
+ * Get product by ID
+ */
+async function getProduct(id) {
+  try {
+    const db = getSupabase();
+    
+    const { data, error } = await db
+      .from('products')
+      .select('*')
+      .eq('id', id)
+      .single();
+
+    if (error) throw error;
+    return data;
+  } catch (error) {
+    console.error('Database error:', error);
+    return null;
+  }
+}
+
+/**
+ * Get products with filters
+ */
+async function getProducts(filters = {}) {
+  try {
+    const db = getSupabase();
+    let query = db.from('products').select('*');
+
+    if (filters.platform) {
+      query = query.eq('platform', filters.platform);
+    }
+    if (filters.in_stock !== undefined) {
+      query = query.eq('in_stock', filters.in_stock);
+    }
+    if (filters.min_price) {
+      query = query.gte('current_price', filters.min_price);
+    }
+    if (filters.max_price) {
+      query = query.lte('current_price', filters.max_price);
+    }
+    if (filters.limit) {
+      query = query.limit(filters.limit);
+    }
+    if (filters.offset) {
+      query = query.range(filters.offset, filters.offset + (filters.limit || 20) - 1);
+    }
+
+    const { data, error } = await query.order('created_at', { ascending: false });
+
+    if (error) throw error;
+    return data || [];
+  } catch (error) {
+    console.error('Database error:', error);
+    return [];
+  }
+}
+
 // ============================================
-// ALERT OPERATIONS WITH ERROR RECOVERY
+// PRICE HISTORY OPERATIONS
 // ============================================
 
 /**
- * Create alert with retry logic
+ * Update price and add to history
  */
-async function createAlertWithRetry(alertData, maxRetries = 3) {
-  let lastError;
-  
-  for (let attempt = 1; attempt <= maxRetries; attempt++) {
-    try {
-      const { data, error } = await supabase
-        .from('alerts')
-        .insert([{
-          ...alertData,
-          created_at: new Date().toISOString()
-        }])
-        .select()
-        .single();
-
-      if (error) throw error;
-      return data;
-    } catch (error) {
-      lastError = error;
-      console.error(`Alert creation attempt ${attempt} failed:`, error.message);
+async function updatePrice(productId, priceData) {
+  try {
+    const db = getSupabase();
+    
+    // Get current price first
+    const { data: currentProduct } = await db
+      .from('products')
+      .select('current_price')
+      .eq('id', productId)
+      .single();
+    
+    const priceChanged = currentProduct && 
+                        currentProduct.current_price !== priceData.price;
+    
+    // Log price history if changed
+    if (!currentProduct || priceChanged) {
+      const historyRecord = {
+        product_id: productId,
+        price: priceData.price,
+        in_stock: priceData.in_stock !== undefined ? priceData.in_stock : true,
+        recorded_at: priceData.timestamp || new Date().toISOString()
+      };
       
-      if (attempt < maxRetries) {
-        // Exponential backoff
-        await new Promise(resolve => 
-          setTimeout(resolve, Math.pow(2, attempt) * 1000)
-        );
+      if (priceData.currency) {
+        historyRecord.currency = priceData.currency;
       }
+      
+      const { error: historyError } = await db
+        .from('price_history')
+        .insert([historyRecord]);
+
+      if (historyError) throw historyError;
+
+      // Update product's current price
+      const { error: updateError } = await db
+        .from('products')
+        .update({
+          current_price: priceData.price,
+          in_stock: priceData.in_stock !== undefined ? priceData.in_stock : true,
+          last_checked: new Date().toISOString()
+        })
+        .eq('id', productId);
+
+      if (updateError) throw updateError;
     }
+    
+    return { priceChanged };
+  } catch (error) {
+    console.error('Database error:', error);
+    throw error;
   }
-  
-  throw new Error(`Failed to create alert after ${maxRetries} attempts: ${lastError.message}`);
+}
+
+/**
+ * Get price history
+ */
+async function getPriceHistory(productId, days = 30) {
+  try {
+    const db = getSupabase();
+    
+    const startDate = new Date();
+    startDate.setDate(startDate.getDate() - days);
+
+    const { data, error } = await db
+      .from('price_history')
+      .select('*')
+      .eq('product_id', productId)
+      .gte('recorded_at', startDate.toISOString())
+      .order('recorded_at', { ascending: true });
+
+    if (error) throw error;
+    return { history: data || [] };
+  } catch (error) {
+    console.error('Database error:', error);
+    return { history: [] };
+  }
+}
+
+// ============================================
+// ALERT OPERATIONS
+// ============================================
+
+/**
+ * Create alert
+ */
+async function createAlert(alertData) {
+  try {
+    const db = getSupabase();
+    
+    const { data, error } = await db
+      .from('alerts')
+      .insert([{
+        ...alertData,
+        created_at: new Date().toISOString()
+      }])
+      .select()
+      .single();
+
+    if (error) throw error;
+    return data;
+  } catch (error) {
+    console.error('Database error:', error);
+    throw error;
+  }
+}
+
+/**
+ * Get alerts for user
+ */
+async function getAlerts(userId, options = {}) {
+  try {
+    const db = getSupabase();
+    
+    let query = db
+      .from('alerts')
+      .select('*')
+      .eq('user_id', userId)
+      .order('created_at', { ascending: false });
+
+    if (options.status && options.status !== 'all') {
+      query = query.eq('status', options.status);
+    }
+
+    if (options.triggered !== undefined) {
+      query = query.eq('triggered', options.triggered);
+    }
+    
+    if (options.limit) {
+      query = query.limit(options.limit);
+    }
+    
+    if (options.offset) {
+      query = query.range(options.offset, options.offset + (options.limit || 20) - 1);
+    }
+
+    const { data, error } = await query;
+
+    if (error) throw error;
+    return data || [];
+  } catch (error) {
+    console.error('Database error:', error);
+    throw error;
+  }
+}
+
+/**
+ * Get alert by ID
+ */
+async function getAlertById(alertId) {
+  try {
+    const db = getSupabase();
+    
+    const { data, error } = await db
+      .from('alerts')
+      .select('*')
+      .eq('id', alertId)
+      .single();
+
+    if (error) {
+      if (error.code === 'PGRST116') return null;
+      throw error;
+    }
+
+    return data;
+  } catch (error) {
+    console.error('Database error:', error);
+    return null;
+  }
+}
+
+/**
+ * Update alert
+ */
+async function updateAlert(alertId, updates) {
+  try {
+    const db = getSupabase();
+    
+    const { data, error } = await db
+      .from('alerts')
+      .update({
+        ...updates,
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', alertId)
+      .select()
+      .single();
+
+    if (error) throw error;
+    return data;
+  } catch (error) {
+    console.error('Database error:', error);
+    throw error;
+  }
+}
+
+/**
+ * Delete alert
+ */
+async function deleteAlert(alertId) {
+  try {
+    const db = getSupabase();
+    
+    const { error } = await db
+      .from('alerts')
+      .delete()
+      .eq('id', alertId);
+
+    if (error) throw error;
+    return true;
+  } catch (error) {
+    console.error('Database error:', error);
+    throw error;
+  }
 }
 
 // ============================================
@@ -266,8 +459,9 @@ async function createAlertWithRetry(alertData, maxRetries = 3) {
  */
 async function checkDatabaseHealth() {
   try {
-    // Test basic query
-    const { error } = await supabase
+    const db = getSupabase();
+    
+    const { error } = await db
       .from('api_users')
       .select('count', { count: 'exact', head: true })
       .limit(1);
@@ -288,24 +482,46 @@ async function checkDatabaseHealth() {
   }
 }
 
+/**
+ * Initialize database (for testing)
+ */
+async function initDatabase() {
+  try {
+    const db = getSupabase();
+    console.log('Database initialized');
+    return true;
+  } catch (error) {
+    console.error('Failed to initialize database:', error);
+    return false;
+  }
+}
+
 // Export all functions
 module.exports = {
-  supabase,
+  supabase: supabaseProxy,
+  getSupabase,
   
   // User operations
   createUser,
   getUserByApiKey,
-  rotateApiKey,
   
   // Product operations  
   createProduct,
+  getProduct,
+  getProducts,
+  
+  // Price operations
+  updatePrice,
+  getPriceHistory,
   
   // Alert operations
-  createAlertWithRetry,
+  createAlert,
+  getAlerts,
+  getAlertById,
+  updateAlert,
+  deleteAlert,
   
   // Health check
   checkDatabaseHealth,
-  
-  // Re-export other functions you need from original database.js
-  // Add them here as needed...
+  initDatabase
 };

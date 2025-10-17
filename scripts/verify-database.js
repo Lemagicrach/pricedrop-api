@@ -1,20 +1,26 @@
 // scripts/verify-database.js - Verify Database Setup
-const { createClient } = require('@supabase/supabase-js');
 require('dotenv').config({ path: '.env.local' });
+const { createClient } = require('@supabase/supabase-js');
 
 const supabaseUrl = process.env.SUPABASE_URL;
 const supabaseKey = process.env.SUPABASE_ANON_KEY;
 
+console.log('🔍 Verifying Database Setup...\n');
+console.log('Environment Check:');
+console.log(`  SUPABASE_URL: ${supabaseUrl ? '✅ Set' : '❌ Missing'}`);
+console.log(`  SUPABASE_ANON_KEY: ${supabaseKey ? '✅ Set' : '❌ Missing'}\n`);
+
 if (!supabaseUrl || !supabaseKey) {
-  console.error('❌ Missing SUPABASE_URL or SUPABASE_ANON_KEY');
+  console.error('❌ Missing SUPABASE_URL or SUPABASE_ANON_KEY in .env.local');
+  console.error('   Please add these to your .env.local file:');
+  console.error('   SUPABASE_URL=https://your-project.supabase.co');
+  console.error('   SUPABASE_ANON_KEY=your_anon_key_here');
   process.exit(1);
 }
 
 const supabase = createClient(supabaseUrl, supabaseKey);
 
 async function verifyDatabase() {
-  console.log('🔍 Verifying Database Setup...\n');
-  
   const tests = [
     {
       name: 'Products table with platform column',
@@ -150,20 +156,27 @@ async function verifyDatabase() {
     console.log('\n🎉 Database is properly configured!');
     console.log('You can now run the API without errors.\n');
     
-    // Test the actual service
-    console.log('Testing ProductService...');
-    const { ProductService } = require('../services/supabase');
-    
-    const { data: products, error } = await ProductService.getProductsToCheck(5);
-    if (!error) {
-      console.log(`✅ ProductService works! Found ${products?.length || 0} products to check.`);
-    } else {
-      console.log(`❌ ProductService error: ${error.message}`);
+    // Test the database service
+    console.log('Testing Database Service...');
+    try {
+      const db = require('../services/database');
+      const health = await db.checkDatabaseHealth();
+      
+      if (health.healthy) {
+        console.log('✅ Database service works!');
+      } else {
+        console.log('⚠️  Database service issue:', health.message);
+      }
+    } catch (error) {
+      console.log('⚠️  Could not test database service:', error.message);
     }
     
   } else {
     console.log('\n❌ Database setup incomplete!');
-    console.log('Please run the SQL script in Supabase SQL Editor.');
+    console.log('Please run the SQL fix script in Supabase SQL Editor.');
+    console.log('\nTo fix:');
+    console.log('1. Go to: https://supabase.com/dashboard/project/YOUR_PROJECT/sql');
+    console.log('2. Run the SQL from migrations/fix_database.sql');
   }
 }
 
