@@ -1,0 +1,131 @@
+# Privacy Policy
+
+**Last Updated**: October 17, 2025
+
+## Introduction
+
+PriceDrop API ("we", "our", or "us") is committed to protecting your privacy. This Privacy Policy explains how we collect, use, disclose, and safeguard your information when you use our API service through RapidAPI.
+
+## Information We Collect
+
+### Automatically Collected Information
+
+When you use the PriceDrop API, we automatically collect:
+
+- **API Request Data**: Endpoint accessed, request parameters, timestamps
+- **Authentication Data**: API key (provided by RapidAPI), subscription tier
+- **Technical Data**: IP address, user agent, response times, error logs
+- **Usage Metrics**: Number of requests, rate limit status, quota consumption
+
+### User-Provided Information
+
+You may provide:
+
+- **Email Address**: For price alert notifications (optional)
+- **Product URLs**: URLs of products you wish to track
+- **Price Preferences**: Target prices and alert thresholds
+
+## How We Use Your Information
+
+We use collected information to:
+
+1. **Provide Services**: Process API requests, track prices, send alerts
+2. **Improve Performance**: Monitor API health, optimize response times
+3. **Enforce Limits**: Track usage against subscription quotas
+4. **Security**: Detect and prevent abuse, fraud, or unauthorized access
+5. **Analytics**: Understand usage patterns to improve features
+6. **Communication**: Send price drop notifications (if opted in)
+
+## Data Storage and Retention
+
+- **API Logs**: Retained for 90 days for debugging and security
+- **Product Data**: Stored as long as actively tracked, deleted 30 days after tracking stops
+- **Price History**: Retained indefinitely for historical analysis
+- **User Accounts**: Retained while subscription is active, deleted 30 days after cancellation
+
+## Data Sharing and Disclosure
+
+We **DO NOT** sell your personal information. We may share data with:
+
+- **RapidAPI**: For authentication, billing, and marketplace operations
+- **Service Providers**: Supabase (database), SendGrid (email), Vercel (hosting)
+- **Legal Requirements**: If required by law or to protect our rights
+
+## Third-Party Services
+
+Our API integrates with:
+
+- **eBay**: Product data retrieved via eBay Finding API
+- **Amazon**: Affiliate links generated (no personal data shared)
+- **RapidAPI**: Authentication and billing platform
+- **Supabase**: Database hosting (encrypted at rest)
+- **SendGrid**: Email delivery service
+- **Vercel**: Serverless hosting platform
+
+Each service has its own privacy policy. We recommend reviewing them.
+
+## Data Security
+
+We implement industry-standard security measures:
+
+- **Encryption**: All data transmitted via HTTPS (TLS 1.2+)
+- **Database Security**: Encrypted at rest, access-controlled
+- **API Key Protection**: Never logged or exposed in responses
+- **Rate Limiting**: Prevents abuse and unauthorized access
+- **Regular Audits**: Security reviews and dependency updates
+
+## Your Rights (GDPR Compliance)
+
+If you are in the European Economic Area (EEA), you have the right to:
+
+- **Access**: Request a copy of your data
+- **Rectification**: Correct inaccurate data
+- **Erasure**: Request deletion of your data ("right to be forgotten")
+- **Portability**: Receive your data in a machine-readable format
+- **Restriction**: Limit how we process your data
+- **Objection**: Opt out of certain data processing activities
+
+To exercise these rights, contact us at privacy@pricedrop-api.com.
+
+## California Privacy Rights (CCPA)
+
+California residents have additional rights:
+
+- **Know**: What personal information is collected and how it's used
+- **Delete**: Request deletion of personal information
+- **Opt-Out**: Opt out of sale of personal information (we don't sell data)
+- **Non-Discrimination**: Equal service regardless of privacy choices
+
+## Cookies and Tracking
+
+Our API does **not** use cookies. We collect minimal technical data (IP address, user agent) for security and performance monitoring only.
+
+## Children's Privacy
+
+Our API is not intended for users under 13 years of age. We do not knowingly collect data from children.
+
+## International Data Transfers
+
+Your data may be transferred to and processed in countries other than your own. We ensure adequate safeguards are in place for such transfers.
+
+## Changes to This Policy
+
+We may update this Privacy Policy periodically. Changes will be posted with an updated "Last Updated" date. Continued use of the API constitutes acceptance of changes.
+
+## Contact Us
+
+For privacy-related questions or requests:
+
+- **Email**: privacy@pricedrop-api.com
+- **Support**: support@pricedrop-api.com
+- **GitHub Issues**: https://github.com/Lemagicrach/pricedrop-api/issues
+
+## Data Protection Officer
+
+For GDPR-related inquiries, contact our Data Protection Officer at dpo@pricedrop-api.com.
+
+---
+
+**PriceDrop API Team**  
+*Committed to transparency and data protection*
+

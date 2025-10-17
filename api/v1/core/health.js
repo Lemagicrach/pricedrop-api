@@ -1,79 +1,102 @@
-// api/v1/core/health.js - Health Check
-// Route: GET /api/v1/core/health
-// Auth: Public (no authentication required)
+// api/v1/core/health.js - Health Check Endpoint
+const os = require('os');
+const { testConnection } = require('../../../lib/services/database');
 
-const { publicRoute } = require('../../../lib/middleware');
-const { success } = require('../../../lib/utils/response');
-
-module.exports = publicRoute(async (req, res) => {
-  // Check service dependencies
-  const checks = {
-    api: 'operational',
-    database: await checkDatabase(),
-    ebay_api: await checkEbayAPI(),
-    amazon_api: 'limited', // PA-API requires approval
-    rapidapi: 'configured'
-  };
-
-  // Calculate overall health
-  const allOperational = Object.values(checks).every(
-    status => status === 'operational' || status === 'configured' || status === 'limited'
-  );
-
-  return success(res, {
-    status: allOperational ? 'healthy' : 'degraded',
-    version: '1.0.0',
+/**
+ * Get system health status
+ * @returns {Promise<Object>} Health status object
+ */
+async function getHealthStatus() {
+  const startTime = process.hrtime();
+  
+  // Check database connection
+  const dbHealthy = await testConnection();
+  
+  // Calculate response time
+  const [seconds, nanoseconds] = process.hrtime(startTime);
+  const responseTime = seconds * 1000 + nanoseconds / 1000000;
+  
+  // Determine overall status
+  const status = dbHealthy ? 'healthy' : 'degraded';
+  
+  return {
+    success: true,
+    status,
     service: 'PriceDrop API',
-    checks,
+    version: process.env.API_VERSION || '1.0.0',
+    timestamp: new Date().toISOString(),
     uptime: {
       seconds: process.uptime(),
       formatted: formatUptime(process.uptime())
     },
-    resources: {
-      memory: {
-        used: `${(process.memoryUsage().heapUsed / 1024 / 1024).toFixed(2)} MB`,
-        total: `${(process.memoryUsage().heapTotal / 1024 / 1024).toFixed(2)} MB`
-      },
-      cpu: process.cpuUsage()
+    environment: process.env.NODE_ENV || 'development',
+    checks: {
+      database: {
+        status: dbHealthy ? 'healthy' : 'unhealthy',
+        responseTime: `${responseTime.toFixed(2)}ms`
+      }
     },
-    rapidapi: {
-      headers_detected: {
-        'X-RapidAPI-Key': !!req.headers['x-rapidapi-key'],
-        'X-RapidAPI-Host': !!req.headers['x-rapidapi-host']
+    system: {
+      memory: {
+        used: process.memoryUsage().heapUsed,
+        total: process.memoryUsage().heapTotal,
+        percentage: ((process.memoryUsage().heapUsed / process.memoryUsage().heapTotal) * 100).toFixed(2)
       },
-      cors_enabled: true,
-      auth_not_required: true,
-      note: 'This endpoint does not require authentication'
+      cpu: {
+        loadAverage: os.loadavg(),
+        cores: os.cpus().length
+      }
     }
-  });
-});
-
-// Helper functions
-async function checkDatabase() {
-  try {
-    const { supabase } = require('../../../services/database');
-    if (!supabase) return 'not_configured';
-    
-    const { error } = await supabase.from('products').select('count').limit(1);
-    return error ? 'error' : 'operational';
-  } catch {
-    return 'not_configured';
-  }
+  };
 }
 
-async function checkEbayAPI() {
-  try {
-    const eBayAPI = require('../../../lib/ebay');
-    const ebay = new eBayAPI();
-    return ebay.isConfigured() ? 'operational' : 'not_configured';
-  } catch {
-    return 'error';
-  }
-}
-
+/**
+ * Format uptime in human-readable format
+ * @param {number} seconds - Uptime in seconds
+ * @returns {string} Formatted uptime
+ */
 function formatUptime(seconds) {
   const days = Math.floor(seconds / 86400);
   const hours = Math.floor((seconds % 86400) / 3600);
   const minutes = Math.floor((seconds % 3600) / 60);
-  return `${days}d ${hours}h ${minutes}m`;
+  const secs = Math.floor(seconds % 60);
+  
+  const parts = [];
+  if (days > 0) parts.push(`${days}d`);
+  if (hours > 0) parts.push(`${hours}h`);
+  if (minutes > 0) parts.push(`${minutes}m`);
+  parts.push(`${secs}s`);
+  
+  return parts.join(' ');
 }
+
+/**
+ * Health check endpoint handler
+ * @param {Object} req - Express request object
+ * @param {Object} res - Express response object
+ */
+async function healthHandler(req, res) {
+  try {
+    const healthStatus = await getHealthStatus();
+    
+    // Set the response body for testing
+    res.body = healthStatus;
+    
+    // Send the response
+    const statusCode = healthStatus.status === 'healthy' ? 200 : 503;
+    res.status(statusCode).json(healthStatus);
+  } catch (error) {
+    const errorResponse = {
+      success: false,
+      status: 'unhealthy',
+      service: 'PriceDrop API',
+      error: error.message,
+      timestamp: new Date().toISOString()
+    };
+    
+    res.body = errorResponse;
+    res.status(503).json(errorResponse);
+  }
+}
+
+module.exports = healthHandler;

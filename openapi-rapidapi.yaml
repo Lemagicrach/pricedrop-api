@@ -33,7 +33,7 @@ info:
     
     ### Support
     
-    - **Documentation**: https://pricedrop-api.vercel.app/docs
+    - **Documentation**: https://pricedrop-api-five.vercel.app/docs
     - **GitHub**: https://github.com/Lemagicrach/pricedrop-api
     - **Email**: support@pricedrop-api.com
     
@@ -47,7 +47,7 @@ info:
   termsOfService: https://github.com/Lemagicrach/pricedrop-api/blob/main/docs/TERMS_OF_SERVICE.md
 
 servers:
-  - url: https://pricedrop-api.vercel.app
+  - url: https://pricedrop-api-five.vercel.app
     description: Production server
   - url: https://pricedrop-api-staging.vercel.app
     description: Staging server (for testing)
@@ -200,21 +200,13 @@ paths:
         image, seller information, and direct links.
       operationId: searchProducts
       parameters:
-        - name: query
+        - name: keywords
           in: query
           required: true
           description: Search keywords (e.g., "iPhone 15 Pro", "Sony headphones")
           schema:
             type: string
             example: iPhone 15 Pro
-        - name: platform
-          in: query
-          required: false
-          description: E-commerce platform to search (default is eBay)
-          schema:
-            type: string
-            enum: [ebay, amazon]
-            default: ebay
         - name: minPrice
           in: query
           required: false
@@ -229,23 +221,14 @@ paths:
           description: Maximum price filter in USD
           schema:
             type: number
-            minimum: 0
-            example: 1000
-        - name: condition
-          in: query
-          required: false
-          description: Product condition filter
-          schema:
-            type: string
-            enum: [new, used, refurbished, any]
-            default: any
+            minimum: 0            example: 1000
         - name: sortBy
           in: query
           required: false
           description: Sort order for results
           schema:
             type: string
-            enum: [price_asc, price_desc, relevance, ending_soonest]
+            enum: [relevance, price, newest]
             default: relevance
         - name: limit
           in: query
@@ -266,12 +249,28 @@ paths:
                 properties:
                   success:
                     type: boolean
-                  count:
-                    type: integer
-                  products:
-                    type: array
-                    items:
-                      $ref: '#/components/schemas/Product'
+                  data:
+                    type: object
+                    properties:
+                      query:
+                        type: object
+                        properties:
+                          keywords:
+                            type: string
+                          limit:
+                            type: integer
+                          sortBy:
+                            type: string
+                          filters:
+                            type: object
+                      count:
+                        type: integer
+                      totalResults:
+                        type: integer
+                      items:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/Product'
         '400':
           $ref: '#/components/responses/BadRequest'
         '429':
@@ -329,33 +328,30 @@ paths:
               type: object
               required:
                 - url
-                - targetPrice
               properties:
                 url:
                   type: string
                   format: uri
-                  description: Product URL from supported platform
+                  description: Product URL from a supported retailer (Amazon, eBay, Walmart, Target, BestBuy)
                   example: https://www.ebay.com/itm/123456789
-                targetPrice:
+                target_price:
                   type: number
                   minimum: 0
-                  description: Target price in USD - alert when price drops below this
-                  example: 799.99
-                checkFrequency:
-                  type: string
-                  enum: [1min, 5min, 15min, 1hour, 6hour, 24hour]
-                  default: 15min
-                  description: How often to check the price (tier-dependent)
-                email:
+                  description: Optional target price in USD for triggering alerts
+                notify_on_drop:
+                  type: boolean
+                  description: Whether to alert on any price drop even if target price is not met
+                  default: true
+                user_email:
                   type: string
                   format: email
-                  description: Email address for price drop notifications
-                  example: user@example.com
-                webhook:
-                  type: string
-                  format: uri
-                  description: Webhook URL for real-time notifications (ULTRA+ only)
-                  example: https://your-app.com/webhook/price-alert
+                  description: Email address for immediate alerts when the target price is met
+                check_frequency:
+                  type: integer
+                  minimum: 1
+                  maximum: 24
+                  default: 1
+                  description: How often (in hours) the product should be checked
       responses:
         '201':
           description: Product tracking started
@@ -366,16 +362,35 @@ paths:
                 properties:
                   success:
                     type: boolean
-                  trackingId:
-                    type: string
-                  product:
-                    $ref: '#/components/schemas/Product'
-                  currentPrice:
-                    type: number
-                  targetPrice:
-                    type: number
-                  checkFrequency:
-                    type: string
+                                    data:
+                    type: object
+                    properties:
+                      message:
+                        type: string
+                      tracking:
+                        type: object
+                        properties:
+                          id:
+                            type: string
+                          product_id:
+                            type: string
+                          url:
+                            type: string
+                          platform:
+                            type: string
+                          target_price:
+                            type: number
+                          notify_on_drop:
+                            type: boolean
+                          check_frequency_hours:
+                            type: integer
+                      product:
+                        $ref: '#/components/schemas/Product'
+                      alerts:
+                        type: object
+                      next_check:
+                        type: string
+                        format: date-time
         '400':
           $ref: '#/components/responses/BadRequest'
         '402':
@@ -401,19 +416,18 @@ paths:
             schema:
               type: object
               required:
-                - urls
+                - product
               properties:
-                urls:
-                  type: array
-                  minItems: 2
-                  maxItems: 10
-                  items:
-                    type: string
-                    format: uri
-                  description: Array of product URLs to compare
-                  example:
-                    - https://www.ebay.com/itm/123456789
-                    - https://www.amazon.com/dp/B08L5VHQNQ
+                product:
+                  type: string
+                  description: Product name or keywords to compare across marketplaces
+                  example: PlayStation 5 console
+                limit:
+                  type: integer
+                  minimum: 1
+                  maximum: 50
+                  default: 10
+                  description: Maximum number of listings to include per marketplace
       responses:
         '200':
           description: Price comparison results
@@ -424,19 +438,20 @@ paths:
                 properties:
                   success:
                     type: boolean
-                  comparison:
+                  data:
                     type: object
                     properties:
-                      products:
-                        type: array
-                        items:
-                          $ref: '#/components/schemas/Product'
-                      bestDeal:
+                      query:
                         type: object
-                      priceDifference:
-                        type: number
-                      savings:
-                        type: number
+                      comparison:
+                        type: object
+                        properties:
+                          ebay:
+                            type: object
+                          amazon:
+                            type: object
+                      summary:
+                        type: object
 
   /api/v1/prices/history:
     get:

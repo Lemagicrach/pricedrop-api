@@ -82,9 +82,10 @@ module.exports = publicRoute(async (req, res) => {
     ],
     
     rate_limits: {
-      free: '100 requests/day',
-      basic: '1,000 requests/day',
-      pro: '10,000 requests/day',
+      free: '100 requests/month',
+      basic: '1,000 requests/month',
+      pro: '10,000 requests/month',
+      ultra: '50,000 requests/month',
       enterprise: 'Custom'
     },
     
